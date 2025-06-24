@@ -294,6 +294,15 @@ export const App = () => {
   const handleListboxKeyDown = (event) => {
     if (!currentBreakdown) return;
 
+    // Check if focus is currently on an action button
+    const activeElement = document.activeElement;
+    const isActionButtonFocused = activeElement && activeElement.closest('[data-option-index]') && activeElement.tagName === 'BUTTON';
+    
+    // If an action button is focused, don't handle arrow keys at the listbox level
+    if (isActionButtonFocused && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      return;
+    }
+
     const maxIndex = currentBreakdown.breakdown.length - 1;
     let newIndex = selectedIndex;
 
