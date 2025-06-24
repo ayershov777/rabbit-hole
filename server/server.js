@@ -24,7 +24,7 @@ setInterval(() => {
     }
 }, 60 * 60 * 1000); // Clean up every hour
 
-const createSystemPrompt = () => {
+const createBreakdownSystemPrompt = () => {
     return `You are an expert educational assistant that helps break down complex concepts into prerequisite knowledge areas. Your goal is to identify what someone needs to understand BEFORE they can grasp the concept they're asking about.
 
 Rules:
@@ -35,9 +35,41 @@ Rules:
 5. Each item should be specific enough to be useful but broad enough to be broken down further
 6. Consider the learning path context - if this is a deep dive from a broader topic, make the breakdown more specific
 7. Avoid trivial or overly obvious items
-// 8. Focus on conceptual understanding rather than practical steps
+8. Focus on conceptual understanding rather than practical steps
 
 Format: Return ONLY a JSON array like ["concept 1", "concept 2", "concept 3"]`;
+};
+
+const createImportanceSystemPrompt = () => {
+    return `You are an expert educational assistant that explains why concepts are important and valuable to learn. Your goal is to help learners understand the significance, benefits, and real-world applications of concepts.
+
+Rules:
+1. Provide a clear, engaging explanation of why the concept is important
+2. Include practical applications and real-world relevance
+3. Explain how it connects to broader fields or other concepts
+4. Highlight career or academic benefits where applicable
+5. Use concrete examples when possible
+6. Make it motivating and inspiring for the learner
+7. Consider the learning path context to provide relevant importance
+8. Keep the response well-structured and easy to read
+
+Format: Return a comprehensive but concise explanation (2-4 paragraphs) that motivates learning this concept.`;
+};
+
+const createOverviewSystemPrompt = () => {
+    return `You are an expert educational assistant that provides clear, comprehensive overviews of concepts. Your goal is to give learners a solid understanding of what the concept is, its key components, and how it works.
+
+Rules:
+1. Provide a clear, well-structured overview of the concept
+2. Include the main components, principles, or aspects
+3. Explain how different parts relate to each other
+4. Use accessible language appropriate for someone learning this topic
+5. Include relevant examples or analogies when helpful
+6. Consider the learning path context to provide appropriate depth
+7. Focus on understanding rather than memorization
+8. Keep it comprehensive but digestible
+
+Format: Return a well-organized explanation (3-5 paragraphs) that gives a thorough overview of the concept.`;
 };
 
 const generateBreakdown = async (concept, learningPath = []) => {
@@ -56,7 +88,7 @@ const generateBreakdown = async (concept, learningPath = []) => {
                 history: [
                     {
                         role: 'user',
-                        parts: [{ text: createSystemPrompt() }]
+                        parts: [{ text: createBreakdownSystemPrompt() }]
                     },
                     {
                         role: 'model',
@@ -79,7 +111,7 @@ const generateBreakdown = async (concept, learningPath = []) => {
 
 Now I want to understand: "${concept}"
 
-Given this learning journey, what specific prerequisite knowledge do I need to understand "${concept}" in the context of ${learningPath[0]}${learningPath [1] ? ` and ${learningPath[learningPath.length - 1]}` : ''}?
+Given this learning journey, what specific prerequisite knowledge do I need to understand "${concept}" in the context of ${learningPath[0]}${learningPath[1] ? ` and ${learningPath[learningPath.length - 1]}` : ''}?
 
 Provide a focused breakdown that considers where I am in my learning journey.`;
         } else {
@@ -93,7 +125,78 @@ Provide the fundamental prerequisite knowledge areas.`;
         return response.text();
 
     } catch (error) {
-        console.error('Error generating content:', error);
+        console.error('Error generating breakdown:', error);
+        throw error;
+    }
+};
+
+const generateContent = async (concept, action, learningPath = []) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+
+        // Create session key for content generation
+        const sessionKey = `${action}_${learningPath.join(' -> ')}_${concept}`;
+        let chatSession;
+
+        if (chatSessions.has(sessionKey)) {
+            chatSession = chatSessions.get(sessionKey).chat;
+            chatSessions.get(sessionKey).lastUsed = Date.now();
+        } else {
+            const systemPrompt = action === 'importance'
+                ? createImportanceSystemPrompt()
+                : createOverviewSystemPrompt();
+
+            chatSession = model.startChat({
+                history: [
+                    {
+                        role: 'user',
+                        parts: [{ text: systemPrompt }]
+                    },
+                    {
+                        role: 'model',
+                        parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'clear explanations of why concepts are important and valuable to learn' : 'comprehensive overviews of concepts'}, considering the learning context and making the content engaging and accessible.` }]
+                    }
+                ]
+            });
+
+            chatSessions.set(sessionKey, {
+                chat: chatSession,
+                lastUsed: Date.now()
+            });
+        }
+
+        // Create contextual prompt
+        let prompt;
+        if (action === 'importance') {
+            if (learningPath.length > 0) {
+                const pathString = learningPath.join(' → ');
+                prompt = `Learning path so far: ${pathString}
+
+I'm learning about: "${concept}"
+
+Why is "${concept}" important to understand, especially in the context of my learning journey toward ${learningPath[0]}? What are the practical benefits and real-world applications?`;
+            } else {
+                prompt = `Why is "${concept}" important to learn? What are the practical benefits, real-world applications, and how does it connect to other important areas of knowledge?`;
+            }
+        } else { // overview
+            if (learningPath.length > 0) {
+                const pathString = learningPath.join(' → ');
+                prompt = `Learning path so far: ${pathString}
+
+I want to understand: "${concept}"
+
+Please provide a comprehensive overview of "${concept}" that's relevant to my learning journey toward ${learningPath[0]}. What are the key components, principles, and how does it work?`;
+            } else {
+                prompt = `Please provide a comprehensive overview of "${concept}". What are the key components, principles, and how does it work? Help me understand what this concept is all about.`;
+            }
+        }
+
+        const result = await chatSession.sendMessage(prompt);
+        const response = await result.response;
+        return response.text();
+
+    } catch (error) {
+        console.error(`Error generating ${action}:`, error);
         throw error;
     }
 };
@@ -180,6 +283,46 @@ app.post('/api/breakdown', async (req, res) => {
     }
 });
 
+// API endpoint for content generation (importance/overview)
+app.post('/api/content', async (req, res) => {
+    try {
+        const { concept, action, learningPath = [] } = req.body;
+
+        if (!concept) {
+            return res.status(400).json({ error: 'Concept is required' });
+        }
+
+        if (!action || !['importance', 'overview'].includes(action)) {
+            return res.status(400).json({ error: 'Valid action is required (importance or overview)' });
+        }
+
+        console.log(`Generating ${action} for: "${concept}" with learning path: [${learningPath.join(' → ')}]`);
+
+        const content = await generateContent(concept, action, learningPath);
+
+        // Clean up the content (remove excessive whitespace, ensure proper formatting)
+        const cleanedContent = content
+            .trim()
+            .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newlines
+            .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+            .replace(/\. /g, '. ') // Ensure proper sentence spacing
+            .trim();
+
+        if (!cleanedContent || cleanedContent.length < 50) {
+            throw new Error(`Generated ${action} content is too short or empty`);
+        }
+
+        res.json({ content: cleanedContent });
+
+    } catch (error) {
+        console.error(`Error in /api/content (${req.body.action}):`, error);
+        res.status(500).json({
+            error: `Failed to generate ${req.body.action || 'content'}`,
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({
@@ -195,12 +338,29 @@ app.post('/api/clear-history', (req, res) => {
     const { learningPath = [] } = req.body;
     const sessionKey = learningPath.join(' -> ') || 'root';
 
+    let clearedSessions = 0;
+
+    // Clear the main breakdown session
     if (chatSessions.has(sessionKey)) {
         chatSessions.delete(sessionKey);
-        console.log(`Cleared chat history for session: ${sessionKey}`);
+        clearedSessions++;
     }
 
-    res.json({ success: true, cleared: sessionKey });
+    // Clear any related content sessions
+    const keysToDelete = [];
+    for (const key of chatSessions.keys()) {
+        if (key.includes(sessionKey) || key.startsWith('importance_') || key.startsWith('overview_')) {
+            keysToDelete.push(key);
+        }
+    }
+
+    keysToDelete.forEach(key => {
+        chatSessions.delete(key);
+        clearedSessions++;
+    });
+
+    console.log(`Cleared ${clearedSessions} chat sessions for path: ${sessionKey}`);
+    res.json({ success: true, cleared: sessionKey, sessionsCleared: clearedSessions });
 });
 
 // Serve React app in production
