@@ -242,42 +242,17 @@ export const App = () => {
     getContent(concept.trim(), 'breakdown');
   };
 
-  const handleOptionHover = (index) => {
-    setSelectedIndex(index);
-    setExpandedIndex(index);
-    // Allow time for collapse animation to complete before making buttons focusable
-    setTimeout(() => {
-      setMenuButtonsReady(true);
-    }, 150); // Match the collapse animation timing
-  };
-
-  const handleOptionLeave = (event) => {
-    // Only close if not moving to a child element (like action buttons)
-    const currentTarget = event.currentTarget;
-    const relatedTarget = event.relatedTarget;
-    
-    // Check if the new target is within the current list item
-    if (relatedTarget && currentTarget.contains(relatedTarget)) {
-      return; // Don't close if moving within the same list item
-    }
-    
-    // Immediately make buttons non-focusable
-    setMenuButtonsReady(false);
-    
-    // Small delay to allow moving to action buttons and prevent accidental closes
-    setTimeout(() => {
-      setExpandedIndex(-1);
-      setSelectedIndex(-1);
-    }, 200);
-  };
-
   const handleOptionClick = (option, index) => {
-    // Keep the item selected when clicked
     setSelectedIndex(index);
-    setExpandedIndex(index);
-    setTimeout(() => {
-      setMenuButtonsReady(true);
-    }, 150);
+    // Toggle expansion - if already expanded, collapse; otherwise expand
+    if (expandedIndex === index) {
+      handleMenuCollapse();
+    } else {
+      setExpandedIndex(index);
+      setTimeout(() => {
+        setMenuButtonsReady(true);
+      }, 150);
+    }
   };
 
   const handleMenuCollapse = () => {
@@ -309,12 +284,9 @@ export const App = () => {
     // Only reset if focus is not moving to action buttons
     const relatedTarget = event.relatedTarget;
     if (!relatedTarget || !event.currentTarget.contains(relatedTarget)) {
-      // Don't immediately close - let action button blur handlers manage this
+      // Close any open menus when focus leaves the listbox entirely
       setTimeout(() => {
-        if (!menuButtonsReady) {
-          setSelectedIndex(-1);
-          setExpandedIndex(-1);
-        }
+        handleMenuCollapse();
       }, 100);
     }
   };
@@ -783,7 +755,7 @@ export const App = () => {
                 {contentType === 'breakdown' && currentBreakdown && (
                   <>
                     <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: '#1a1a2e' }}>
-                      Hover over a concept or use arrow keys to explore options:
+                      Click on a concept or use arrow keys to explore options:
                     </Typography>
                     
                     <List
@@ -815,8 +787,6 @@ export const App = () => {
                           data-option-index={index}
                           aria-selected={selectedIndex === index}
                           aria-expanded={expandedIndex === index}
-                          onMouseEnter={() => handleOptionHover(index)}
-                          onMouseLeave={handleOptionLeave}
                           onClick={() => handleOptionClick(option, index)}
                           sx={{
                             display: 'block',
