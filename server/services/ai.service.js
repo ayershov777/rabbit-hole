@@ -33,20 +33,19 @@ Format: Return ONLY a JSON array like ["concept 1", "concept 2", "concept 3"]`;
     }
 
     createImportanceSystemPrompt() {
-        return `You are an expert educational assistant that explains why concepts are important and valuable to learn. Your goal is to help learners understand the significance, benefits, and real-world applications of concepts.
+        return `You are an expert educational assistant that explains why concepts are important in a very concise way. Your goal is to provide quick, compelling reasons why someone should learn a concept.
 
 Rules:
-1. Provide a clear, engaging explanation of why the concept is important
-2. Include practical applications and real-world relevance
-3. Explain how it connects to broader fields or other concepts
-4. Highlight career or academic benefits where applicable
-5. Use concrete examples when possible
-6. Make it motivating and inspiring for the learner
-7. Consider the learning path context to provide relevant importance
-8. Keep the response concise and focused - aim for 2-3 short paragraphs maximum
-9. Be specific and actionable rather than overly general
+1. Keep responses extremely short - 1-2 sentences maximum (30-50 words)
+2. Focus on the most compelling reason to learn this concept
+3. Be specific and actionable rather than overly general
+4. Highlight the key practical benefit or application
+5. Make it motivating and clear
+6. Consider the learning path context to provide relevant importance
+7. Avoid fluff or unnecessary words
+8. Get straight to the point
 
-Format: Return a concise but compelling explanation (2-3 paragraphs, about 150-200 words) that motivates learning this concept.`;
+Format: Return 1-2 concise sentences (30-50 words maximum) explaining the key importance.`;
     }
 
     createOverviewSystemPrompt() {
@@ -149,7 +148,7 @@ Provide the fundamental prerequisite knowledge areas.`;
                         },
                         {
                             role: 'model',
-                            parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'concise explanations of why concepts are important and valuable to learn' : 'comprehensive but concise overviews of concepts'}, keeping responses to 2-3 short paragraphs (150-200 words) and considering the learning context.` }]
+                            parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'extremely concise explanations (1-2 sentences, 30-50 words) of why concepts are important' : 'comprehensive but concise overviews of concepts (2-3 short paragraphs, 150-200 words)'}, considering the learning context.` }]
                         }
                     ]
                 });
@@ -166,13 +165,15 @@ Provide the fundamental prerequisite knowledge areas.`;
             if (action === 'importance') {
                 if (learningPath.length > 0) {
                     const pathString = learningPath.join(' → ');
-                    prompt = `Learning path so far: ${pathString}
+                    prompt = `Learning path: ${pathString}
 
-I'm learning about: "${concept}"
+Why is "${concept}" important for understanding ${learningPath[0]}? 
 
-Why is "${concept}" important to understand, especially in the context of my learning journey toward ${learningPath[0]}? What are the key practical benefits and real-world applications? Keep it concise but compelling (2-3 short paragraphs, about 150-200 words).`;
+Respond with 1-2 sentences maximum (30-50 words). Be extremely concise and focus on the key benefit.`;
                 } else {
-                    prompt = `Why is "${concept}" important to learn? What are the key practical benefits, real-world applications, and how does it connect to other important areas? Keep it concise but compelling (2-3 short paragraphs, about 150-200 words).`;
+                    prompt = `Why is "${concept}" important to learn? 
+
+Respond with 1-2 sentences maximum (30-50 words). Be extremely concise and focus on the key benefit.`;
                 }
             } else { // overview
                 if (learningPath.length > 0) {
@@ -195,6 +196,109 @@ Please provide a concise overview of "${concept}" that's relevant to my learning
             console.error(`Error generating ${action}:`, error);
             throw error;
         }
+    }
+
+    async generateBulkImportance(concepts, learningPath = [], userId = null) {
+        try {
+            const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+            
+            const sessionKey = `${userId || 'anonymous'}_bulk_importance_${learningPath.join(' -> ')}`;
+            let chatSession;
+
+            if (this.chatSessions.has(sessionKey)) {
+                chatSession = this.chatSessions.get(sessionKey).chat;
+                this.chatSessions.get(sessionKey).lastUsed = Date.now();
+            } else {
+                chatSession = model.startChat({
+                    history: [
+                        {
+                            role: 'user',
+                            parts: [{ text: this.createImportanceSystemPrompt() }]
+                        },
+                        {
+                            role: 'model',
+                            parts: [{ text: 'I understand. I will provide extremely concise explanations (1-2 sentences, 30-50 words) of why concepts are important, focusing on the key benefits and practical applications.' }]
+                        }
+                    ]
+                });
+
+                this.chatSessions.set(sessionKey, {
+                    chat: chatSession,
+                    lastUsed: Date.now(),
+                    userId: userId
+                });
+            }
+
+            let prompt;
+            if (learningPath.length > 0) {
+                const pathString = learningPath.join(' → ');
+                prompt = `Learning path: ${pathString}
+
+For each of these concepts, explain why it's important (1-2 sentences, 30-50 words each):
+${concepts.map((concept, i) => `${i + 1}. ${concept}`).join('\n')}
+
+Focus on how each concept helps with understanding ${learningPath[0]}. Format as:
+1. [concept]: [importance]
+2. [concept]: [importance]
+etc.`;
+            } else {
+                prompt = `For each of these concepts, explain why it's important (1-2 sentences, 30-50 words each):
+${concepts.map((concept, i) => `${i + 1}. ${concept}`).join('\n')}
+
+Format as:
+1. [concept]: [importance]
+2. [concept]: [importance]
+etc.`;
+            }
+
+            const result = await chatSession.sendMessage(prompt);
+            const response = await result.response;
+            return this.parseBulkImportanceResponse(response.text(), concepts);
+
+        } catch (error) {
+            console.error('Error generating bulk importance:', error);
+            throw error;
+        }
+    }
+
+    parseBulkImportanceResponse(text, concepts) {
+        const importanceMap = {};
+        const lines = text.split('\n').filter(line => line.trim());
+
+        // Try to match numbered format first
+        lines.forEach(line => {
+            const match = line.match(/^\d+\.\s*(.+?):\s*(.+)$/);
+            if (match) {
+                const [, concept, importance] = match;
+                const cleanConcept = concept.trim();
+                const cleanImportance = importance.trim();
+                
+                // Find the closest matching concept from our original list
+                const matchingConcept = concepts.find(c => 
+                    c.toLowerCase().includes(cleanConcept.toLowerCase()) ||
+                    cleanConcept.toLowerCase().includes(c.toLowerCase())
+                );
+                
+                if (matchingConcept) {
+                    importanceMap[matchingConcept] = cleanImportance;
+                }
+            }
+        });
+
+        // Fallback: try to extract any concept-importance pairs
+        if (Object.keys(importanceMap).length === 0) {
+            concepts.forEach(concept => {
+                // Escape special regex characters and create pattern
+                const escapedConcept = concept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`${escapedConcept}:?\\s*(.+?)(?=\\n|$)`, 'i');
+                const match = text.match(regex);
+                if (match) {
+                    importanceMap[concept] = match[1].trim();
+                }
+            });
+        }
+
+        return importanceMap;
     }
 
     clearSessions(userId = null, learningPath = []) {

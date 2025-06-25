@@ -16,6 +16,18 @@ import { BreadcrumbNavigation } from './components/BreadcrumbNavigation';
 import { BreakdownList } from './components/BreakdownList';
 import { ContentDisplay } from './components/ContentDisplay';
 
+// Utility function to convert markdown to HTML
+const markdownToHtml = (text) => {
+  if (!text) return '';
+
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`(.*?)`/g, '<code>$1</code>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+};
+
 const loadingMessages = [
   "Analyzing concept complexity...",
   "Identifying knowledge prerequisites...",
@@ -31,13 +43,6 @@ const actionLoadingMessages = {
     "Mapping learning pathways...",
     "Organizing foundational concepts...",
     "Finalizing breakdown structure..."
-  ],
-  importance: [
-    "Analyzing concept importance...",
-    "Identifying key benefits...",
-    "Connecting to broader context...",
-    "Highlighting practical applications...",
-    "Finalizing importance explanation..."
   ],
   overview: [
     "Gathering key information...",
@@ -64,6 +69,7 @@ export const RabbitHole = () => {
   const [expandedIndex, setExpandedIndex] = useState(-1);
   const [menuButtonsReady, setMenuButtonsReady] = useState(false);
   const [contentCache, setContentCache] = useState(new Map());
+  const [importanceData, setImportanceData] = useState({}); // New state for importance explanations
 
   const resultsHeaderRef = useRef(null);
 
@@ -129,6 +135,7 @@ export const RabbitHole = () => {
     if (action === 'breakdown') {
       setCurrentBreakdown(null);
       setCurrentContent(null);
+      setImportanceData({}); // Clear importance data when starting new breakdown
     } else {
       setCurrentContent(null);
     }
@@ -171,7 +178,7 @@ export const RabbitHole = () => {
       setLoadingProgress(100);
       setLoadingMessage("Complete!");
 
-      setTimeout(() => {
+      setTimeout(async () => {
         let contentToCache;
 
         if (action === 'breakdown') {
@@ -186,6 +193,33 @@ export const RabbitHole = () => {
           setContentType('breakdown');
           contentToCache = newBreakdown;
 
+          // Generate importance explanations for all breakdown items
+          try {
+            const importanceResponse = await fetch('/api/bulk-importance', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders(),
+              },
+              body: JSON.stringify({
+                concepts: data.breakdown,
+                learningPath: learningPath
+              })
+            });
+
+            if (importanceResponse.ok) {
+              const importanceResult = await importanceResponse.json();
+              // Process markdown in importance data
+              const processedImportance = {};
+              Object.entries(importanceResult.importance).forEach(([key, value]) => {
+                processedImportance[key] = markdownToHtml(value);
+              });
+              setImportanceData(processedImportance);
+            }
+          } catch (importanceError) {
+            console.warn('Could not load importance explanations:', importanceError);
+          }
+
           // Add to history or update existing
           setBreakdownHistory(prev => {
             const newHistory = [...prev];
@@ -198,7 +232,7 @@ export const RabbitHole = () => {
         } else {
           const newContent = {
             concept: conceptText,
-            content: data.content,
+            content: markdownToHtml(data.content), // Process markdown here
             action: action,
             timestamp: Date.now()
           };
@@ -253,6 +287,7 @@ export const RabbitHole = () => {
     setError('');
     setExpandedIndex(-1);
     setContentCache(new Map());
+    setImportanceData({}); // Clear importance data
 
     // Clear chat history on server for fresh start
     try {
@@ -363,7 +398,7 @@ export const RabbitHole = () => {
         event.preventDefault();
         if (selectedIndex >= 0 && selectedIndex <= maxIndex) {
           const option = currentBreakdown.breakdown[selectedIndex];
-          handleActionSelect(option, 'importance');
+          handleActionSelect(option, 'overview');
         }
         return;
       case 'Escape':
@@ -408,8 +443,6 @@ export const RabbitHole = () => {
     if (!currentContent) return '';
 
     switch (currentContent.action) {
-      case 'importance':
-        return `Why "${currentContent.concept}" is Important`;
       case 'overview':
         return `Overview of "${currentContent.concept}"`;
       default:
@@ -421,8 +454,6 @@ export const RabbitHole = () => {
     if (!currentContent) return '';
 
     switch (currentContent.action) {
-      case 'importance':
-        return 'Understanding the significance and benefits:';
       case 'overview':
         return 'Key concepts and principles:';
       default:
@@ -567,7 +598,7 @@ export const RabbitHole = () => {
               }}>
                 <Box sx={{ position: 'relative', zIndex: 2 }}>
                   {/* Back Button for Content Views */}
-                  {(contentType === 'importance' || contentType === 'overview') && (
+                  {contentType === 'overview' && (
                     <Button
                       onClick={goBackToBreakdown}
                       startIcon={<ArrowLeft size={16} />}
@@ -614,10 +645,11 @@ export const RabbitHole = () => {
                     onOptionClick={handleOptionClick}
                     onActionSelect={handleActionSelect}
                     onKeyDown={handleListboxKeyDown}
+                    importanceData={importanceData}
                   />
                 )}
 
-                {/* Content Display (Importance/Overview) */}
+                {/* Content Display (Overview) */}
                 {currentContent && (
                   <ContentDisplay
                     content={currentContent}

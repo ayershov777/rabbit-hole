@@ -9,16 +9,9 @@ import {
     Grid,
     Button
 } from '@mui/material';
-import { ChevronDown, ChevronUp, HelpCircle, FileText, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, TrendingUp } from 'lucide-react';
 
 const actionButtons = [
-    {
-        id: 'importance',
-        label: 'Why It\'s Important',
-        icon: <HelpCircle size={18} />,
-        color: '#0066ff',
-        variant: 'contained'
-    },
     {
         id: 'overview',
         label: 'Get an Overview',
@@ -41,7 +34,8 @@ export const BreakdownList = ({
     expandedIndex,
     onOptionClick,
     onActionSelect,
-    onKeyDown
+    onKeyDown,
+    importanceData = {} // New prop to hold importance explanations
 }) => {
     const listboxRef = useRef(null);
 
@@ -180,6 +174,55 @@ export const BreakdownList = ({
                                     background: '#f8f9fa'
                                 }}
                             >
+                                {/* Why It's Important Section */}
+                                {importanceData[option] && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography
+                                            variant="subtitle2"
+                                            sx={{
+                                                fontWeight: 700,
+                                                color: '#0066ff',
+                                                mb: 1,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}
+                                        >
+                                            💡 Why It's Important
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                color: '#1a1a2e',
+                                                lineHeight: 1.6,
+                                                fontSize: '0.95rem',
+                                                fontStyle: 'italic',
+                                                background: '#fff',
+                                                p: 2,
+                                                borderRadius: 1,
+                                                border: '1px solid #e9ecef',
+                                                '& strong, & b': {
+                                                    fontWeight: 700,
+                                                    color: '#0066ff'
+                                                },
+                                                '& em, & i': {
+                                                    fontStyle: 'italic'
+                                                },
+                                                '& code': {
+                                                    background: '#f5f5f5',
+                                                    padding: '2px 4px',
+                                                    borderRadius: '3px',
+                                                    fontSize: '0.9em',
+                                                    fontFamily: 'monospace'
+                                                }
+                                            }}
+                                            dangerouslySetInnerHTML={{
+                                                __html: importanceData[option]
+                                            }}
+                                        />
+                                    </Box>
+                                )}
+
                                 <Typography
                                     variant="subtitle1"
                                     sx={{
@@ -194,7 +237,7 @@ export const BreakdownList = ({
 
                                 <Grid container spacing={2}>
                                     {actionButtons.map((action) => (
-                                        <Grid item xs={12} sm={4} key={action.id}>
+                                        <Grid item xs={12} sm={6} key={action.id}>
                                             <Button
                                                 fullWidth
                                                 variant={action.variant}

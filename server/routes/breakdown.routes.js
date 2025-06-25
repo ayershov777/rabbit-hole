@@ -31,7 +31,32 @@ router.post('/breakdown', optionalAuth, async (req, res) => {
     }
 });
 
-// API endpoint for content generation (importance/overview)
+// API endpoint for bulk importance generation
+router.post('/bulk-importance', optionalAuth, async (req, res) => {
+    try {
+        const { concepts, learningPath = [] } = req.body;
+        const userId = req.user?._id;
+
+        if (!concepts || !Array.isArray(concepts) || concepts.length === 0) {
+            return res.status(400).json({ error: 'Concepts array is required' });
+        }
+
+        console.log(`Generating bulk importance for: [${concepts.join(', ')}] with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
+
+        const importance = await aiService.generateBulkImportance(concepts, learningPath, userId);
+
+        res.json({ importance });
+
+    } catch (error) {
+        console.error('Error in /api/bulk-importance:', error);
+        res.status(500).json({
+            error: 'Failed to generate importance explanations',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// API endpoint for content generation (overview)
 router.post('/content', optionalAuth, async (req, res) => {
     try {
         const { concept, action, learningPath = [] } = req.body;
@@ -41,8 +66,8 @@ router.post('/content', optionalAuth, async (req, res) => {
             return res.status(400).json({ error: 'Concept is required' });
         }
 
-        if (!action || !['importance', 'overview'].includes(action)) {
-            return res.status(400).json({ error: 'Valid action is required (importance or overview)' });
+        if (!action || !['overview'].includes(action)) {
+            return res.status(400).json({ error: 'Valid action is required (overview)' });
         }
 
         console.log(`Generating ${action} for: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);

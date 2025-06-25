@@ -1,15 +1,8 @@
 import React from 'react';
 import { Box, Typography, Divider, Grid, Button } from '@mui/material';
-import { HelpCircle, FileText, TrendingUp } from 'lucide-react';
+import { FileText, TrendingUp } from 'lucide-react';
 
 const actionButtons = [
-    {
-        id: 'importance',
-        label: 'Why It\'s Important',
-        icon: <HelpCircle size={18} />,
-        color: '#0066ff',
-        variant: 'contained'
-    },
     {
         id: 'overview',
         label: 'Get an Overview',
@@ -35,11 +28,37 @@ export const ContentDisplay = ({ content, onActionSelect }) => {
                     color: '#1a1a2e',
                     lineHeight: 1.8,
                     fontSize: '1.1rem',
-                    whiteSpace: 'pre-wrap'
+                    '& strong, & b': {
+                        fontWeight: 700,
+                        color: '#0066ff'
+                    },
+                    '& em, & i': {
+                        fontStyle: 'italic',
+                        color: '#4a4a6a'
+                    },
+                    '& code': {
+                        background: '#f5f5f5',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '0.95em',
+                        fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+                        border: '1px solid #e9ecef'
+                    },
+                    '& p': {
+                        marginBottom: '1em'
+                    },
+                    '& ul, & ol': {
+                        paddingLeft: '1.5em',
+                        marginBottom: '1em'
+                    },
+                    '& li': {
+                        marginBottom: '0.5em'
+                    }
                 }}
-            >
-                {content.content}
-            </Typography>
+                dangerouslySetInnerHTML={{
+                    __html: content.content
+                }}
+            />
 
             {/* Action Buttons for Content Views */}
             <Divider sx={{ my: 4 }} />
