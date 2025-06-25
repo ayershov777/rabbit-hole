@@ -31,6 +31,8 @@ import {
   FileText,
   ArrowLeft
 } from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthButton } from './components/AuthButton';
 
 const loadingMessages = [
   "Analyzing concept complexity...",
@@ -64,7 +66,8 @@ const actionLoadingMessages = {
   ]
 };
 
-export const App = () => {
+export const RabbitHole = () => {
+  const { getAuthHeaders } = useAuth();
   const [concept, setConcept] = useState('');
   const [currentBreakdown, setCurrentBreakdown] = useState(null);
   const [currentContent, setCurrentContent] = useState(null);
@@ -77,14 +80,14 @@ export const App = () => {
   const [error, setError] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [lastSelectedIndex, setLastSelectedIndex] = useState(-1);
-  
+
   // Content cache to avoid re-generating same content
   const [contentCache, setContentCache] = useState(new Map());
-  
+
   // Expandable panel state
   const [expandedIndex, setExpandedIndex] = useState(-1);
   const [menuButtonsReady, setMenuButtonsReady] = useState(false);
-  
+
   const listboxRef = useRef(null);
   const resultsHeaderRef = useRef(null);
 
@@ -116,24 +119,24 @@ export const App = () => {
     // Create learning path from current breadcrumb history up to current index
     const activePath = breakdownHistory.slice(0, currentHistoryIndex + 1);
     const learningPath = activePath.map(item => item.concept);
-    
+
     // Create cache key for this specific content
     const cacheKey = `${action}_${conceptText}_${learningPath.join('->')}`;
-    
+
     // Check if we already have this content cached
     if (contentCache.has(cacheKey)) {
       const cachedContent = contentCache.get(cacheKey);
       console.log(`Using cached content for: ${action} - ${conceptText}`);
-      
+
       // Display cached content immediately without loading
       setSelectedIndex(-1);
       setExpandedIndex(-1);
-      
+
       if (action === 'breakdown') {
         setCurrentBreakdown(cachedContent);
         setCurrentContent(null);
         setContentType('breakdown');
-        
+
         // Update history if this is a new breakdown
         if (cachedContent.concept !== (breakdownHistory[currentHistoryIndex]?.concept)) {
           setBreakdownHistory(prev => {
@@ -148,7 +151,7 @@ export const App = () => {
         setCurrentContent(cachedContent);
         setContentType(action);
       }
-      
+
       // Scroll to results
       setTimeout(() => {
         if (resultsHeaderRef.current) {
@@ -158,26 +161,26 @@ export const App = () => {
           });
         }
       }, 100);
-      
+
       return; // Exit early, no need to fetch
     }
-    
+
     // If not cached, proceed with loading and API call
     console.log(`Fetching new content for: ${action} - ${conceptText}`);
     setLoading(true);
     setError('');
     setLoadingProgress(0);
-    
+
     const messages = actionLoadingMessages[action] || loadingMessages;
     setLoadingMessage(messages[0]);
-    
+
     if (action === 'breakdown') {
       setCurrentBreakdown(null);
       setCurrentContent(null);
     } else {
       setCurrentContent(null);
     }
-    
+
     setSelectedIndex(-1);
     setExpandedIndex(-1); // Collapse any expanded panels
 
@@ -196,9 +199,10 @@ export const App = () => {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           concept: conceptText,
           learningPath: learningPath,
           action: action
@@ -217,7 +221,7 @@ export const App = () => {
 
       setTimeout(() => {
         let contentToCache;
-        
+
         if (action === 'breakdown') {
           const newBreakdown = {
             concept: conceptText,
@@ -229,18 +233,18 @@ export const App = () => {
           setCurrentContent(null);
           setContentType('breakdown');
           contentToCache = newBreakdown;
-          
+
           // Add to history or update existing
           setBreakdownHistory(prev => {
             const newHistory = [...prev];
             const newIndex = currentHistoryIndex + 1;
-            
+
             // If we're not at the end of history, replace from this point forward
             newHistory[newIndex] = newBreakdown;
             // Remove any items beyond this point
             return newHistory.slice(0, newIndex + 1);
           });
-          
+
           setCurrentHistoryIndex(prev => prev + 1);
         } else {
           const newContent = {
@@ -249,12 +253,12 @@ export const App = () => {
             action: action,
             timestamp: Date.now()
           };
-          
+
           setCurrentContent(newContent);
           setContentType(action);
           contentToCache = newContent;
         }
-        
+
         // Cache the content for future use
         setContentCache(prev => {
           const newCache = new Map(prev);
@@ -264,7 +268,7 @@ export const App = () => {
 
         setLoading(false);
         clearInterval(progressInterval);
-        
+
         // Scroll to results header after results load
         setTimeout(() => {
           if (resultsHeaderRef.current) {
@@ -275,7 +279,7 @@ export const App = () => {
           }
         }, 100);
 
-    }, 500);
+      }, 500);
 
     } catch (error) {
       console.error(`Error getting ${action}:`, error);
@@ -290,7 +294,7 @@ export const App = () => {
       setError('Please enter a concept to understand');
       return;
     }
-    
+
     // Clear everything when starting fresh
     setBreakdownHistory([]);
     setCurrentHistoryIndex(-1);
@@ -300,20 +304,21 @@ export const App = () => {
     setError('');
     setExpandedIndex(-1);
     setContentCache(new Map()); // Clear the cache for fresh start
-    
+
     // Clear chat history on server for fresh start
     try {
       await fetch('/api/clear-history', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ learningPath: [] })
       });
     } catch (error) {
       console.warn('Could not clear chat history:', error);
     }
-    
+
     getContent(concept.trim(), 'breakdown');
   };
 
@@ -382,7 +387,7 @@ export const App = () => {
     // Check if focus is currently on an action button
     const activeElement = document.activeElement;
     const isActionButtonFocused = activeElement && activeElement.closest('[data-option-index]') && activeElement.tagName === 'BUTTON';
-    
+
     // If an action button is focused, don't handle arrow keys at the listbox level
     if (isActionButtonFocused && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
       return;
@@ -482,7 +487,7 @@ export const App = () => {
 
   const getContentTitle = () => {
     if (!currentContent) return '';
-    
+
     switch (currentContent.action) {
       case 'importance':
         return `Why "${currentContent.concept}" is Important`;
@@ -495,7 +500,7 @@ export const App = () => {
 
   const getContentDescription = () => {
     if (!currentContent) return '';
-    
+
     switch (currentContent.action) {
       case 'importance':
         return 'Understanding the significance and benefits:';
@@ -525,19 +530,20 @@ export const App = () => {
   }, [currentBreakdown, currentContent]);
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
       py: 4
     }}>
+      <AuthButton />
       <Container maxWidth="md">
         {/* Header */}
         <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
             <Lightbulb size={48} color="#1a1a2e" />
           </Box>
-          <Typography 
-            variant="h2" 
+          <Typography
+            variant="h2"
             component="h1"
             sx={{
               fontWeight: 900,
@@ -559,9 +565,9 @@ export const App = () => {
           >
             Knowledge Breakdown
           </Typography>
-          <Typography 
-            variant="h6" 
-            sx={{ 
+          <Typography
+            variant="h6"
+            sx={{
               color: '#4a4a6a',
               fontWeight: 500,
               maxWidth: 600,
@@ -573,7 +579,7 @@ export const App = () => {
         </Box>
 
         {/* Main Input */}
-        <Paper 
+        <Paper
           elevation={0}
           sx={{
             p: 4,
@@ -601,7 +607,7 @@ export const App = () => {
                 What do you want to understand?
               </Typography>
             </Box>
-            
+
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'stretch' }}>
               <TextField
                 fullWidth
@@ -694,9 +700,9 @@ export const App = () => {
 
         {/* Error Display */}
         {error && (
-          <Alert 
-            severity="error" 
-            sx={{ 
+          <Alert
+            severity="error"
+            sx={{
               mb: 4,
               border: '3px solid #d32f2f',
               borderRadius: 2,
@@ -722,8 +728,8 @@ export const App = () => {
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#1a1a2e' }}>
               {loadingMessage}
             </Typography>
-            <LinearProgress 
-              variant="determinate" 
+            <LinearProgress
+              variant="determinate"
               value={loadingProgress}
               sx={{
                 height: 12,
@@ -818,9 +824,9 @@ export const App = () => {
               }}
             >
               {/* Header with Back Button for Content Views */}
-              <Box sx={{ 
-                background: '#1a1a2e', 
-                color: '#fafafa', 
+              <Box sx={{
+                background: '#1a1a2e',
+                color: '#fafafa',
                 p: 3,
                 position: 'relative',
                 overflow: 'hidden',
@@ -854,13 +860,13 @@ export const App = () => {
                       Back to Breakdown
                     </Button>
                   )}
-                  
-                  <Typography 
+
+                  <Typography
                     ref={resultsHeaderRef}
-                    variant="h5" 
+                    variant="h5"
                     sx={{ fontWeight: 700, mb: 1 }}
                   >
-                    {contentType === 'breakdown' && currentBreakdown 
+                    {contentType === 'breakdown' && currentBreakdown
                       ? `To understand "${currentBreakdown.concept}"`
                       : getContentTitle()
                     }
@@ -881,7 +887,7 @@ export const App = () => {
                     <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: '#1a1a2e' }}>
                       Click on a concept or use arrow keys to explore options:
                     </Typography>
-                    
+
                     <List
                       ref={listboxRef}
                       role="listbox"
@@ -975,10 +981,10 @@ export const App = () => {
                             >
                               {index + 1}
                             </Avatar>
-                            <Typography 
-                              sx={{ 
-                                fontWeight: 600, 
-                                color: '#1a1a2e', 
+                            <Typography
+                              sx={{
+                                fontWeight: 600,
+                                color: '#1a1a2e',
                                 flexGrow: 1,
                                 fontSize: '1.1rem'
                               }}
@@ -986,16 +992,16 @@ export const App = () => {
                               {option}
                             </Typography>
                             {expandedIndex === index ? (
-                              <ChevronUp 
-                                size={20} 
+                              <ChevronUp
+                                size={20}
                                 color="#4a4a6a"
                                 style={{
                                   transition: 'transform 0.3s ease'
                                 }}
                               />
                             ) : (
-                              <ChevronDown 
-                                size={20} 
+                              <ChevronDown
+                                size={20}
                                 color="#4a4a6a"
                                 style={{
                                   transition: 'transform 0.3s ease'
@@ -1013,18 +1019,18 @@ export const App = () => {
                                 background: '#f8f9fa'
                               }}
                             >
-                              <Typography 
-                                variant="subtitle1" 
-                                sx={{ 
-                                  fontWeight: 700, 
-                                  color: '#1a1a2e', 
+                              <Typography
+                                variant="subtitle1"
+                                sx={{
+                                  fontWeight: 700,
+                                  color: '#1a1a2e',
                                   mb: 2,
                                   textAlign: 'center'
                                 }}
                               >
                                 What would you like to do?
                               </Typography>
-                              
+
                               <Grid container spacing={2}>
                                 {actionButtons.map((action) => (
                                   <Grid item xs={12} sm={4} key={action.id}>
@@ -1073,9 +1079,9 @@ export const App = () => {
                 {/* Content Display (Importance/Overview) */}
                 {currentContent && (
                   <Box sx={{ mt: 2 }}>
-                    <Typography 
-                      variant="body1" 
-                      sx={{ 
+                    <Typography
+                      variant="body1"
+                      sx={{
                         color: '#1a1a2e',
                         lineHeight: 1.8,
                         fontSize: '1.1rem',
@@ -1084,58 +1090,58 @@ export const App = () => {
                     >
                       {currentContent.content}
                     </Typography>
-                    
+
                     {/* Action Buttons for Content Views */}
                     <Divider sx={{ my: 4 }} />
-                    
+
                     <Box sx={{ mt: 4 }}>
-                      <Typography 
-                        variant="h6" 
-                        sx={{ 
-                          fontWeight: 700, 
-                          color: '#1a1a2e', 
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight: 700,
+                          color: '#1a1a2e',
                           mb: 3,
                           textAlign: 'center'
                         }}
                       >
                         What would you like to do next?
                       </Typography>
-                      
+
                       <Grid container spacing={2}>
                         {actionButtons
                           .filter(action => action.id !== currentContent.action)
                           .map((action) => (
-                          <Grid item xs={12} sm={6} key={action.id}>
-                            <Button
-                              fullWidth
-                              variant={action.variant}
-                              onClick={() => getContent(currentContent.concept, action.id)}
-                              startIcon={action.icon}
-                              sx={{
-                                height: '60px',
-                                border: action.variant === 'outlined' ? `2px solid ${action.color}` : 'none',
-                                background: action.variant === 'contained' ? action.color : 'transparent',
-                                color: action.variant === 'contained' ? '#fafafa' : action.color,
-                                fontWeight: 600,
-                                textTransform: 'none',
-                                borderRadius: 2,
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                  background: action.color,
-                                  color: '#fafafa',
-                                  transform: 'translateY(-2px)',
-                                  boxShadow: `0 4px 12px ${action.color}33`
-                                },
-                                '& .MuiButton-startIcon': {
-                                  marginRight: 1,
-                                  color: 'inherit'
-                                }
-                              }}
-                            >
-                              {action.label}
-                            </Button>
-                          </Grid>
-                        ))}
+                            <Grid item xs={12} sm={6} key={action.id}>
+                              <Button
+                                fullWidth
+                                variant={action.variant}
+                                onClick={() => getContent(currentContent.concept, action.id)}
+                                startIcon={action.icon}
+                                sx={{
+                                  height: '60px',
+                                  border: action.variant === 'outlined' ? `2px solid ${action.color}` : 'none',
+                                  background: action.variant === 'contained' ? action.color : 'transparent',
+                                  color: action.variant === 'contained' ? '#fafafa' : action.color,
+                                  fontWeight: 600,
+                                  textTransform: 'none',
+                                  borderRadius: 2,
+                                  transition: 'all 0.3s ease',
+                                  '&:hover': {
+                                    background: action.color,
+                                    color: '#fafafa',
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: `0 4px 12px ${action.color}33`
+                                  },
+                                  '& .MuiButton-startIcon': {
+                                    marginRight: 1,
+                                    color: 'inherit'
+                                  }
+                                }}
+                              >
+                                {action.label}
+                              </Button>
+                            </Grid>
+                          ))}
                       </Grid>
                     </Box>
                   </Box>
@@ -1147,16 +1153,24 @@ export const App = () => {
 
         {/* Shimmer Animation */}
         <style jsx>{`
-          @keyframes shimmer {
-            0% {
-              left: -100%;
+            @keyframes shimmer {
+              0% {
+                left: -100%;
+              }
+              100% {
+                left: 100%;
+              }
             }
-            100% {
-              left: 100%;
-            }
-          }
-        `}</style>
+          `}</style>
       </Container>
     </Box>
+  );
+};
+
+export const App = () => {
+  return (
+    <AuthProvider>
+      <RabbitHole />
+    </AuthProvider>
   );
 };

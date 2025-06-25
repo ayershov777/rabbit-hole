@@ -1,11 +1,22 @@
 require('dotenv').config();
 const express = require('express');
+const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const path = require('path');
 const cors = require('cors');
+const authRoutes = require('./routes/auth.routes');
+const { optionalAuth } = require('./middleware/auth.middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('✅ Connected to MongoDB'))
+.catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Initialize Gemini AI
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -74,12 +85,12 @@ Rules:
 Format: Return a well-organized explanation (2-3 paragraphs, about 150-200 words) that gives a thorough but concise overview of the concept.`;
 };
 
-const generateBreakdown = async (concept, learningPath = []) => {
+const generateBreakdown = async (concept, learningPath = [], userId = null) => {
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
 
-        // Create or get existing chat session
-        const sessionKey = learningPath.join(' -> ') || 'root';
+        // Create or get existing chat session (include userId for personalization)
+        const sessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ') || 'root'}`;
         let chatSession;
 
         if (chatSessions.has(sessionKey)) {
@@ -101,7 +112,8 @@ const generateBreakdown = async (concept, learningPath = []) => {
 
             chatSessions.set(sessionKey, {
                 chat: chatSession,
-                lastUsed: Date.now()
+                lastUsed: Date.now(),
+                userId: userId
             });
         }
 
@@ -132,12 +144,12 @@ Provide the fundamental prerequisite knowledge areas.`;
     }
 };
 
-const generateContent = async (concept, action, learningPath = []) => {
+const generateContent = async (concept, action, learningPath = [], userId = null) => {
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
 
         // Create session key for content generation
-        const sessionKey = `${action}_${learningPath.join(' -> ')}_${concept}`;
+        const sessionKey = `${userId || 'anonymous'}_${action}_${learningPath.join(' -> ')}_${concept}`;
         let chatSession;
 
         if (chatSessions.has(sessionKey)) {
@@ -163,7 +175,8 @@ const generateContent = async (concept, action, learningPath = []) => {
 
             chatSessions.set(sessionKey, {
                 chat: chatSession,
-                lastUsed: Date.now()
+                lastUsed: Date.now(),
+                userId: userId
             });
         }
 
@@ -207,23 +220,27 @@ Please provide a concise overview of "${concept}" that's relevant to my learning
 app.use(express.json());
 app.use(cors());
 
+// Auth routes
+app.use('/api/auth', authRoutes);
+
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'build')));
 }
 
 // API endpoint for concept breakdown
-app.post('/api/breakdown', async (req, res) => {
+app.post('/api/breakdown', optionalAuth, async (req, res) => {
     try {
         const { concept, learningPath = [] } = req.body;
+        const userId = req.user?._id;
 
         if (!concept) {
             return res.status(400).json({ error: 'Concept is required' });
         }
 
-        console.log(`Breaking down: "${concept}" with learning path: [${learningPath.join(' → ')}]`);
+        console.log(`Breaking down: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
 
-        const text = await generateBreakdown(concept, learningPath);
+        const text = await generateBreakdown(concept, learningPath, userId);
 
         // Clean the response to ensure it's valid JSON
         let cleanedText = text.trim();
@@ -286,9 +303,10 @@ app.post('/api/breakdown', async (req, res) => {
 });
 
 // API endpoint for content generation (importance/overview)
-app.post('/api/content', async (req, res) => {
+app.post('/api/content', optionalAuth, async (req, res) => {
     try {
         const { concept, action, learningPath = [] } = req.body;
+        const userId = req.user?._id;
 
         if (!concept) {
             return res.status(400).json({ error: 'Concept is required' });
@@ -298,9 +316,9 @@ app.post('/api/content', async (req, res) => {
             return res.status(400).json({ error: 'Valid action is required (importance or overview)' });
         }
 
-        console.log(`Generating ${action} for: "${concept}" with learning path: [${learningPath.join(' → ')}]`);
+        console.log(`Generating ${action} for: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
 
-        const content = await generateContent(concept, action, learningPath);
+        const content = await generateContent(concept, action, learningPath, userId);
 
         // Clean up the content (remove excessive whitespace, ensure proper formatting)
         const cleanedContent = content
@@ -331,14 +349,16 @@ app.get('/api/health', (req, res) => {
         status: 'OK',
         timestamp: new Date().toISOString(),
         apiKeyConfigured: !!GEMINI_API_KEY,
-        activeSessions: chatSessions.size
+        activeSessions: chatSessions.size,
+        mongoConnected: mongoose.connection.readyState === 1
     });
 });
 
 // Clear chat history endpoint
-app.post('/api/clear-history', (req, res) => {
+app.post('/api/clear-history', optionalAuth, (req, res) => {
     const { learningPath = [] } = req.body;
-    const sessionKey = learningPath.join(' -> ') || 'root';
+    const userId = req.user?._id;
+    const sessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ') || 'root'}`;
 
     let clearedSessions = 0;
 
@@ -348,10 +368,10 @@ app.post('/api/clear-history', (req, res) => {
         clearedSessions++;
     }
 
-    // Clear any related content sessions
+    // Clear any related content sessions for this user
     const keysToDelete = [];
     for (const key of chatSessions.keys()) {
-        if (key.includes(sessionKey) || key.startsWith('importance_') || key.startsWith('overview_')) {
+        if (key.includes(sessionKey) || (userId && key.startsWith(`${userId}_`))) {
             keysToDelete.push(key);
         }
     }
@@ -361,7 +381,7 @@ app.post('/api/clear-history', (req, res) => {
         clearedSessions++;
     });
 
-    console.log(`Cleared ${clearedSessions} chat sessions for path: ${sessionKey}`);
+    console.log(`Cleared ${clearedSessions} chat sessions for user: ${userId || 'anonymous'}, path: ${sessionKey}`);
     res.json({ success: true, cleared: sessionKey, sessionsCleared: clearedSessions });
 });
 
@@ -382,5 +402,15 @@ app.listen(PORT, () => {
         console.log('   Please set your API key in a .env file');
     } else {
         console.log('✅ Gemini AI key configured');
+    }
+
+    if (!process.env.MONGODB_URI) {
+        console.warn('⚠️  WARNING: MONGODB_URI environment variable is not set');
+        console.log('   Please set your MongoDB connection string in a .env file');
+    }
+
+    if (!process.env.JWT_SECRET) {
+        console.warn('⚠️  WARNING: JWT_SECRET environment variable is not set');
+        console.log('   Please set a secure JWT secret in a .env file');
     }
 });
