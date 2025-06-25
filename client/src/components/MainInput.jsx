@@ -1,4 +1,3 @@
-import React from 'react';
 import {
     Paper,
     Stack,
@@ -49,7 +48,7 @@ export const MainInput = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                     <Search size={20} color="#1a1a2e" />
                     <Typography variant="h6" sx={{ fontWeight: 700, color: '#1a1a2e' }}>
-                        What do you want to understand?
+                        What concept do you want to explore?
                     </Typography>
                 </Box>
 
@@ -59,7 +58,7 @@ export const MainInput = ({
                         value={concept}
                         onChange={(e) => setConcept(e.target.value)}
                         onKeyPress={handleKeyPress}
-                        placeholder="e.g., Machine Learning, Quantum Physics, Blockchain..."
+                        placeholder="e.g., Machine Learning, Psychology, Climate Change, Blockchain..."
                         disabled={loading}
                         sx={{
                             '& .MuiOutlinedInput-root': {
@@ -136,7 +135,7 @@ export const MainInput = ({
                         startIcon={loading ? <CircularProgress size={16} sx={{ color: '#fafafa !important' }} /> : <ChevronRight size={16} />}
                     >
                         <Box component="span" sx={{ position: 'relative', zIndex: 2, color: '#fafafa !important' }}>
-                            {loading ? 'Analyzing...' : 'Break It Down'}
+                            {loading ? 'Exploring...' : 'Explore'}
                         </Box>
                     </Button>
                 </Box>

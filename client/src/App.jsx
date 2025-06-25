@@ -29,19 +29,19 @@ const markdownToHtml = (text) => {
 };
 
 const loadingMessages = [
-  "Analyzing concept complexity...",
-  "Identifying knowledge prerequisites...",
-  "Mapping learning pathways...",
-  "Organizing foundational concepts...",
+  "Analyzing concept structure...",
+  "Identifying key components...",
+  "Mapping detailed areas...",
+  "Organizing sub-concepts...",
   "Finalizing breakdown structure..."
 ];
 
 const actionLoadingMessages = {
   breakdown: [
-    "Analyzing concept complexity...",
-    "Identifying knowledge prerequisites...",
-    "Mapping learning pathways...",
-    "Organizing foundational concepts...",
+    "Analyzing concept structure...",
+    "Identifying key components...",
+    "Mapping detailed areas...",
+    "Organizing sub-concepts...",
     "Finalizing breakdown structure..."
   ],
   overview: [
@@ -73,10 +73,166 @@ export const RabbitHole = () => {
 
   const resultsHeaderRef = useRef(null);
 
-  const getContent = async (conceptText, action = 'breakdown') => {
+  const getContentWithFreshState = async (conceptText, action, freshState) => {
+    console.log(`Getting fresh content for: "${conceptText}", action: ${action}`);
+
+    const cacheKey = `${action}_${conceptText}_[]`; // Empty learning path for fresh start
+
+    // Check cache (though it should be empty for fresh starts)
+    if (freshState.contentCache.has(cacheKey)) {
+      const cachedContent = freshState.contentCache.get(cacheKey);
+      console.log(`Using cached content for: ${action} - ${conceptText}`);
+
+      setCurrentBreakdown(cachedContent);
+      setCurrentContent(null);
+      setContentType('breakdown');
+
+      // Since this is fresh, add as first item
+      setBreakdownHistory([cachedContent]);
+      setCurrentHistoryIndex(0);
+
+      setTimeout(() => {
+        if (resultsHeaderRef.current) {
+          resultsHeaderRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      }, 100);
+      return;
+    }
+
+    // Proceed with fresh API call
+    console.log(`Fetching new content for: ${action} - ${conceptText}`);
+    setLoading(true);
+    setError('');
+    setLoadingProgress(0);
+
+    const messages = actionLoadingMessages[action] || loadingMessages;
+    setLoadingMessage(messages[0]);
+
+    setCurrentBreakdown(null);
+    setCurrentContent(null);
+    setImportanceData({});
+    setSelectedIndex(-1);
+    setExpandedIndex(-1);
+
+    // Simulate progress updates
+    const progressInterval = setInterval(() => {
+      setLoadingProgress(prev => {
+        const newProgress = Math.min(prev + Math.random() * 20, 90);
+        const messageIndex = Math.floor((newProgress / 90) * (messages.length - 1));
+        setLoadingMessage(messages[messageIndex]);
+        return newProgress;
+      });
+    }, 800);
+
+    try {
+      const response = await fetch('/api/breakdown', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          concept: conceptText,
+          learningPath: [], // Always empty for fresh start
+          action: action
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to get ${action}`);
+      }
+
+      const data = await response.json();
+      setLoadingProgress(100);
+      setLoadingMessage("Complete!");
+
+      setTimeout(async () => {
+        const newBreakdown = {
+          concept: conceptText,
+          breakdown: data.breakdown,
+          timestamp: Date.now()
+        };
+
+        setCurrentBreakdown(newBreakdown);
+        setCurrentContent(null);
+        setContentType('breakdown');
+
+        // Set as first and only item in fresh history
+        console.log('Setting fresh breakdown history:', [newBreakdown]);
+        setBreakdownHistory([newBreakdown]);
+        setCurrentHistoryIndex(0);
+
+        // Generate importance explanations
+        try {
+          const importanceResponse = await fetch('/api/bulk-importance', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders(),
+            },
+            body: JSON.stringify({
+              concepts: data.breakdown,
+              learningPath: []
+            })
+          });
+
+          if (importanceResponse.ok) {
+            const importanceResult = await importanceResponse.json();
+            const processedImportance = {};
+            Object.entries(importanceResult.importance).forEach(([key, value]) => {
+              processedImportance[key] = markdownToHtml(value);
+            });
+            setImportanceData(processedImportance);
+          }
+        } catch (importanceError) {
+          console.warn('Could not load importance explanations:', importanceError);
+        }
+
+        // Cache the content
+        setContentCache(prev => {
+          const newCache = new Map(prev);
+          newCache.set(cacheKey, newBreakdown);
+          return newCache;
+        });
+
+        setLoading(false);
+        clearInterval(progressInterval);
+
+        setTimeout(() => {
+          if (resultsHeaderRef.current) {
+            resultsHeaderRef.current.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        }, 100);
+
+      }, 500);
+
+    } catch (error) {
+      console.error(`Error getting ${action}:`, error);
+      setError(error.message || `Failed to generate ${action}. Please try again.`);
+      setLoading(false);
+      clearInterval(progressInterval);
+    }
+  };
+
+  const getContent = async (conceptText, action = 'breakdown', forceFreshStart = false) => {
     // Create learning path from current breadcrumb history up to current index
-    const activePath = breakdownHistory.slice(0, currentHistoryIndex + 1);
-    const learningPath = activePath.map(item => item.concept);
+    // BUT if this is a forced fresh start, use empty learning path
+    let learningPath = [];
+
+    if (!forceFreshStart) {
+      // Only use learning path if we're continuing an existing exploration and not forcing fresh start
+      const activePath = breakdownHistory.slice(0, currentHistoryIndex + 1);
+      learningPath = activePath.filter(item => item && item.concept).map(item => item.concept);
+    }
+
+    console.log(`Getting content for: "${conceptText}", action: ${action}, learningPath: [${learningPath.join(', ')}], forceFreshStart: ${forceFreshStart}`);
 
     // Create cache key for this specific content
     const cacheKey = `${action}_${conceptText}_${learningPath.join('->')}`;
@@ -97,6 +253,7 @@ export const RabbitHole = () => {
 
         // Update history if this is a new breakdown
         if (cachedContent.concept !== (breakdownHistory[currentHistoryIndex]?.concept)) {
+          console.log('Cached breakdown differs from current, updating history');
           setBreakdownHistory(prev => {
             const newHistory = [...prev];
             const newIndex = currentHistoryIndex + 1;
@@ -222,13 +379,24 @@ export const RabbitHole = () => {
 
           // Add to history or update existing
           setBreakdownHistory(prev => {
+            console.log('Current breakdown history before update:', prev);
+            console.log('Current history index:', currentHistoryIndex);
+            console.log('Adding new breakdown:', newBreakdown);
+
             const newHistory = [...prev];
             const newIndex = currentHistoryIndex + 1;
             newHistory[newIndex] = newBreakdown;
-            return newHistory.slice(0, newIndex + 1);
+            const finalHistory = newHistory.slice(0, newIndex + 1);
+
+            console.log('New breakdown history after update:', finalHistory);
+            return finalHistory;
           });
 
-          setCurrentHistoryIndex(prev => prev + 1);
+          setCurrentHistoryIndex(prev => {
+            const newIndex = prev + 1;
+            console.log('Setting history index to:', newIndex);
+            return newIndex;
+          });
         } else {
           const newContent = {
             concept: conceptText,
@@ -274,36 +442,55 @@ export const RabbitHole = () => {
 
   const startBreakdown = async () => {
     if (!concept.trim()) {
-      setError('Please enter a concept to understand');
+      setError('Please enter a concept to explore');
       return;
     }
 
-    // Clear everything when starting fresh
-    setBreakdownHistory([]);
-    setCurrentHistoryIndex(-1);
-    setCurrentBreakdown(null);
-    setCurrentContent(null);
-    setContentType('breakdown');
-    setError('');
-    setExpandedIndex(-1);
-    setContentCache(new Map());
-    setImportanceData({}); // Clear importance data
+    console.log(`Starting fresh breakdown for: "${concept.trim()}"`);
 
-    // Clear chat history on server for fresh start
+    // Clear everything when starting fresh - do this synchronously to avoid state timing issues
+    const freshState = {
+      breakdownHistory: [],
+      currentHistoryIndex: -1,
+      currentBreakdown: null,
+      currentContent: null,
+      contentType: 'breakdown',
+      error: '',
+      expandedIndex: -1,
+      contentCache: new Map(),
+      importanceData: {}
+    };
+
+    // Set all state at once to avoid timing issues
+    setBreakdownHistory(freshState.breakdownHistory);
+    setCurrentHistoryIndex(freshState.currentHistoryIndex);
+    setCurrentBreakdown(freshState.currentBreakdown);
+    setCurrentContent(freshState.currentContent);
+    setContentType(freshState.contentType);
+    setError(freshState.error);
+    setExpandedIndex(freshState.expandedIndex);
+    setContentCache(freshState.contentCache);
+    setImportanceData(freshState.importanceData);
+
+    // Clear ALL chat history on server for completely fresh start
     try {
-      await fetch('/api/clear-history', {
+      const clearResponse = await fetch('/api/clear-history', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
         },
-        body: JSON.stringify({ learningPath: [] })
+        body: JSON.stringify({ learningPath: [] }) // Empty array = clear all sessions
       });
+
+      const clearResult = await clearResponse.json();
+      console.log('Cleared all chat sessions:', clearResult);
     } catch (error) {
       console.warn('Could not clear chat history:', error);
     }
 
-    getContent(concept.trim(), 'breakdown');
+    // Now get content with explicit fresh start parameters
+    getContentWithFreshState(concept.trim(), 'breakdown', freshState);
   };
 
   const handleOptionClick = (option, index) => {
@@ -326,7 +513,14 @@ export const RabbitHole = () => {
 
   const handleActionSelect = (option, action) => {
     setExpandedIndex(-1);
-    getContent(option, action);
+
+    if (action === 'breakdown') {
+      // For breakdown actions, we need to add to the learning path
+      getContent(option, action, false); // Not a fresh start
+    } else {
+      // For other actions (like overview), don't modify the learning path
+      getContent(option, action, false);
+    }
   };
 
   const goBackToHistory = (index) => {
@@ -502,7 +696,7 @@ export const RabbitHole = () => {
               }
             }}
           >
-            Knowledge Breakdown
+            Concept Explorer
           </Typography>
           <Typography
             variant="h6"
@@ -513,7 +707,7 @@ export const RabbitHole = () => {
               mx: 'auto'
             }}
           >
-            Enter any concept and discover the foundational knowledge you need to understand it
+            Enter any concept and discover the detailed areas and components that make it up
           </Typography>
         </Box>
 
@@ -552,6 +746,7 @@ export const RabbitHole = () => {
         {(currentBreakdown || currentContent) && !loading && (
           <Box>
             {/* Breadcrumb History */}
+            {console.log('Rendering breadcrumbs with:', { history: breakdownHistory, currentIndex: currentHistoryIndex })}
             <BreadcrumbNavigation
               history={breakdownHistory}
               currentIndex={currentHistoryIndex}
@@ -622,13 +817,13 @@ export const RabbitHole = () => {
                     sx={{ fontWeight: 700, mb: 1 }}
                   >
                     {contentType === 'breakdown' && currentBreakdown
-                      ? `To understand "${currentBreakdown.concept}"`
+                      ? `Exploring "${currentBreakdown.concept}"`
                       : getContentTitle()
                     }
                   </Typography>
                   <Typography variant="body1" sx={{ opacity: 0.9 }}>
                     {contentType === 'breakdown'
-                      ? 'You should learn these foundational concepts first:'
+                      ? 'Here are the key areas and components:'
                       : getContentDescription()
                     }
                   </Typography>
@@ -653,7 +848,7 @@ export const RabbitHole = () => {
                 {currentContent && (
                   <ContentDisplay
                     content={currentContent}
-                    onActionSelect={getContent}
+                    onActionSelect={(concept, action) => getContent(concept, action, false)}
                   />
                 )}
               </Box>
