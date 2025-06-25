@@ -16,7 +16,8 @@ import {
   List,
   ListItem,
   Collapse,
-  Grid
+  Grid,
+  Divider
 } from '@mui/material';
 import {
   ChevronRight,
@@ -27,7 +28,8 @@ import {
   Search,
   TrendingUp,
   HelpCircle,
-  FileText
+  FileText,
+  ArrowLeft
 } from 'lucide-react';
 
 const loadingMessages = [
@@ -68,12 +70,16 @@ export const App = () => {
   const [currentContent, setCurrentContent] = useState(null);
   const [contentType, setContentType] = useState('breakdown'); // 'breakdown', 'importance', 'overview'
   const [breakdownHistory, setBreakdownHistory] = useState([]);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [lastSelectedIndex, setLastSelectedIndex] = useState(-1);
+  
+  // Content cache to avoid re-generating same content
+  const [contentCache, setContentCache] = useState(new Map());
   
   // Expandable panel state
   const [expandedIndex, setExpandedIndex] = useState(-1);
@@ -107,6 +113,57 @@ export const App = () => {
   ];
 
   const getContent = async (conceptText, action = 'breakdown') => {
+    // Create learning path from current breadcrumb history up to current index
+    const activePath = breakdownHistory.slice(0, currentHistoryIndex + 1);
+    const learningPath = activePath.map(item => item.concept);
+    
+    // Create cache key for this specific content
+    const cacheKey = `${action}_${conceptText}_${learningPath.join('->')}`;
+    
+    // Check if we already have this content cached
+    if (contentCache.has(cacheKey)) {
+      const cachedContent = contentCache.get(cacheKey);
+      console.log(`Using cached content for: ${action} - ${conceptText}`);
+      
+      // Display cached content immediately without loading
+      setSelectedIndex(-1);
+      setExpandedIndex(-1);
+      
+      if (action === 'breakdown') {
+        setCurrentBreakdown(cachedContent);
+        setCurrentContent(null);
+        setContentType('breakdown');
+        
+        // Update history if this is a new breakdown
+        if (cachedContent.concept !== (breakdownHistory[currentHistoryIndex]?.concept)) {
+          setBreakdownHistory(prev => {
+            const newHistory = [...prev];
+            const newIndex = currentHistoryIndex + 1;
+            newHistory[newIndex] = cachedContent;
+            return newHistory.slice(0, newIndex + 1);
+          });
+          setCurrentHistoryIndex(prev => prev + 1);
+        }
+      } else {
+        setCurrentContent(cachedContent);
+        setContentType(action);
+      }
+      
+      // Scroll to results
+      setTimeout(() => {
+        if (resultsHeaderRef.current) {
+          resultsHeaderRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      }, 100);
+      
+      return; // Exit early, no need to fetch
+    }
+    
+    // If not cached, proceed with loading and API call
+    console.log(`Fetching new content for: ${action} - ${conceptText}`);
     setLoading(true);
     setError('');
     setLoadingProgress(0);
@@ -135,9 +192,6 @@ export const App = () => {
     }, 800);
 
     try {
-      // Create learning path from current breadcrumb history
-      const learningPath = breakdownHistory.map(item => item.concept);
-      
       const endpoint = action === 'breakdown' ? '/api/breakdown' : '/api/content';
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -162,6 +216,8 @@ export const App = () => {
       setLoadingMessage("Complete!");
 
       setTimeout(() => {
+        let contentToCache;
+        
         if (action === 'breakdown') {
           const newBreakdown = {
             concept: conceptText,
@@ -172,23 +228,39 @@ export const App = () => {
           setCurrentBreakdown(newBreakdown);
           setCurrentContent(null);
           setContentType('breakdown');
+          contentToCache = newBreakdown;
           
-          // Only add to history if it's not a duplicate of the last item
+          // Add to history or update existing
           setBreakdownHistory(prev => {
-            if (prev.length === 0 || prev[prev.length - 1].concept !== conceptText) {
-              return [...prev, newBreakdown];
-            }
-            return prev;
+            const newHistory = [...prev];
+            const newIndex = currentHistoryIndex + 1;
+            
+            // If we're not at the end of history, replace from this point forward
+            newHistory[newIndex] = newBreakdown;
+            // Remove any items beyond this point
+            return newHistory.slice(0, newIndex + 1);
           });
+          
+          setCurrentHistoryIndex(prev => prev + 1);
         } else {
-          setCurrentContent({
+          const newContent = {
             concept: conceptText,
             content: data.content,
             action: action,
             timestamp: Date.now()
-          });
+          };
+          
+          setCurrentContent(newContent);
           setContentType(action);
+          contentToCache = newContent;
         }
+        
+        // Cache the content for future use
+        setContentCache(prev => {
+          const newCache = new Map(prev);
+          newCache.set(cacheKey, contentToCache);
+          return newCache;
+        });
 
         setLoading(false);
         clearInterval(progressInterval);
@@ -202,7 +274,8 @@ export const App = () => {
             });
           }
         }, 100);
-      }, 500);
+
+    }, 500);
 
     } catch (error) {
       console.error(`Error getting ${action}:`, error);
@@ -220,11 +293,13 @@ export const App = () => {
     
     // Clear everything when starting fresh
     setBreakdownHistory([]);
+    setCurrentHistoryIndex(-1);
     setCurrentBreakdown(null);
     setCurrentContent(null);
     setContentType('breakdown');
     setError('');
     setExpandedIndex(-1);
+    setContentCache(new Map()); // Clear the cache for fresh start
     
     // Clear chat history on server for fresh start
     try {
@@ -271,9 +346,19 @@ export const App = () => {
     setCurrentBreakdown(historyItem);
     setCurrentContent(null);
     setContentType('breakdown');
-    setBreakdownHistory(prev => prev.slice(0, index + 1));
+    setCurrentHistoryIndex(index); // Don't truncate history, just change current index
     setSelectedIndex(-1);
     setExpandedIndex(-1);
+  };
+
+  const goBackToBreakdown = () => {
+    if (currentHistoryIndex >= 0 && breakdownHistory[currentHistoryIndex]) {
+      setCurrentBreakdown(breakdownHistory[currentHistoryIndex]);
+      setCurrentContent(null);
+      setContentType('breakdown');
+      setSelectedIndex(-1);
+      setExpandedIndex(-1);
+    }
   };
 
   const handleListboxFocus = () => {
@@ -419,6 +504,16 @@ export const App = () => {
       default:
         return '';
     }
+  };
+
+  const getCurrentConcept = () => {
+    if (currentContent) return currentContent.concept;
+    if (currentBreakdown) return currentBreakdown.concept;
+    return '';
+  };
+
+  const getVisibleHistory = () => {
+    return breakdownHistory.slice(0, currentHistoryIndex + 1);
   };
 
   // Reset selected index when breakdown changes
@@ -650,7 +745,7 @@ export const App = () => {
         {(currentBreakdown || currentContent) && !loading && (
           <Box>
             {/* Breadcrumb History */}
-            {breakdownHistory.length > 1 && (
+            {getVisibleHistory().length > 0 && (
               <Paper
                 elevation={0}
                 sx={{
@@ -667,12 +762,12 @@ export const App = () => {
                   </Typography>
                 </Box>
                 <Breadcrumbs separator="›" sx={{ flexWrap: 'wrap' }}>
-                  {breakdownHistory.map((item, index) => (
+                  {getVisibleHistory().map((item, index) => (
                     <Chip
                       key={index}
                       label={item.concept.length > 30 ? item.concept.substring(0, 30) + '...' : item.concept}
                       onClick={() => goBackToHistory(index)}
-                      variant={index === breakdownHistory.length - 1 ? 'filled' : 'outlined'}
+                      variant={index === currentHistoryIndex ? 'filled' : 'outlined'}
                       sx={{
                         margin: '2px 0',
                         fontWeight: 600,
@@ -680,7 +775,7 @@ export const App = () => {
                         borderRadius: 2,
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
-                        ...(index === breakdownHistory.length - 1 ? {
+                        ...(index === currentHistoryIndex ? {
                           background: '#1a1a2e',
                           color: '#fafafa',
                           '&:hover': {
@@ -722,6 +817,7 @@ export const App = () => {
                 }
               }}
             >
+              {/* Header with Back Button for Content Views */}
               <Box sx={{ 
                 background: '#1a1a2e', 
                 color: '#fafafa', 
@@ -740,6 +836,25 @@ export const App = () => {
                 }
               }}>
                 <Box sx={{ position: 'relative', zIndex: 2 }}>
+                  {/* Back Button for Content Views */}
+                  {(contentType === 'importance' || contentType === 'overview') && (
+                    <Button
+                      onClick={goBackToBreakdown}
+                      startIcon={<ArrowLeft size={16} />}
+                      sx={{
+                        color: '#fafafa',
+                        mb: 2,
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        '&:hover': {
+                          background: 'rgba(250, 250, 250, 0.1)'
+                        }
+                      }}
+                    >
+                      Back to Breakdown
+                    </Button>
+                  )}
+                  
                   <Typography 
                     ref={resultsHeaderRef}
                     variant="h5" 
@@ -970,29 +1085,59 @@ export const App = () => {
                       {currentContent.content}
                     </Typography>
                     
-                    {currentContent.action !== 'breakdown' && (
-                      <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid #e9ecef' }}>
-                        <Button
-                          variant="contained"
-                          onClick={() => getContent(currentContent.concept, 'breakdown')}
-                          startIcon={<TrendingUp size={16} />}
-                          sx={{
-                            background: '#0066ff',
-                            color: '#fafafa',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            px: 3,
-                            py: 1.5,
-                            borderRadius: 2,
-                            '&:hover': {
-                              background: '#0052cc'
-                            }
-                          }}
-                        >
-                          Break Down "{currentContent.concept}"
-                        </Button>
-                      </Box>
-                    )}
+                    {/* Action Buttons for Content Views */}
+                    <Divider sx={{ my: 4 }} />
+                    
+                    <Box sx={{ mt: 4 }}>
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          fontWeight: 700, 
+                          color: '#1a1a2e', 
+                          mb: 3,
+                          textAlign: 'center'
+                        }}
+                      >
+                        What would you like to do next?
+                      </Typography>
+                      
+                      <Grid container spacing={2}>
+                        {actionButtons
+                          .filter(action => action.id !== currentContent.action)
+                          .map((action) => (
+                          <Grid item xs={12} sm={6} key={action.id}>
+                            <Button
+                              fullWidth
+                              variant={action.variant}
+                              onClick={() => getContent(currentContent.concept, action.id)}
+                              startIcon={action.icon}
+                              sx={{
+                                height: '60px',
+                                border: action.variant === 'outlined' ? `2px solid ${action.color}` : 'none',
+                                background: action.variant === 'contained' ? action.color : 'transparent',
+                                color: action.variant === 'contained' ? '#fafafa' : action.color,
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                  background: action.color,
+                                  color: '#fafafa',
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: `0 4px 12px ${action.color}33`
+                                },
+                                '& .MuiButton-startIcon': {
+                                  marginRight: 1,
+                                  color: 'inherit'
+                                }
+                              }}
+                            >
+                              {action.label}
+                            </Button>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
                   </Box>
                 )}
               </Box>

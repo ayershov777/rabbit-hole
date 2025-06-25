@@ -51,9 +51,10 @@ Rules:
 5. Use concrete examples when possible
 6. Make it motivating and inspiring for the learner
 7. Consider the learning path context to provide relevant importance
-8. Keep the response well-structured and easy to read
+8. Keep the response concise and focused - aim for 2-3 short paragraphs maximum
+9. Be specific and actionable rather than overly general
 
-Format: Return a comprehensive but concise explanation (2-4 paragraphs) that motivates learning this concept.`;
+Format: Return a concise but compelling explanation (2-3 paragraphs, about 150-200 words) that motivates learning this concept.`;
 };
 
 const createOverviewSystemPrompt = () => {
@@ -67,9 +68,10 @@ Rules:
 5. Include relevant examples or analogies when helpful
 6. Consider the learning path context to provide appropriate depth
 7. Focus on understanding rather than memorization
-8. Keep it comprehensive but digestible
+8. Keep it comprehensive but digestible - aim for 2-3 short paragraphs maximum
+9. Be specific and informative rather than overly broad
 
-Format: Return a well-organized explanation (3-5 paragraphs) that gives a thorough overview of the concept.`;
+Format: Return a well-organized explanation (2-3 paragraphs, about 150-200 words) that gives a thorough but concise overview of the concept.`;
 };
 
 const generateBreakdown = async (concept, learningPath = []) => {
@@ -154,7 +156,7 @@ const generateContent = async (concept, action, learningPath = []) => {
                     },
                     {
                         role: 'model',
-                        parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'clear explanations of why concepts are important and valuable to learn' : 'comprehensive overviews of concepts'}, considering the learning context and making the content engaging and accessible.` }]
+                        parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'concise explanations of why concepts are important and valuable to learn' : 'comprehensive but concise overviews of concepts'}, keeping responses to 2-3 short paragraphs (150-200 words) and considering the learning context.` }]
                     }
                 ]
             });
@@ -174,9 +176,9 @@ const generateContent = async (concept, action, learningPath = []) => {
 
 I'm learning about: "${concept}"
 
-Why is "${concept}" important to understand, especially in the context of my learning journey toward ${learningPath[0]}? What are the practical benefits and real-world applications?`;
+Why is "${concept}" important to understand, especially in the context of my learning journey toward ${learningPath[0]}? What are the key practical benefits and real-world applications? Keep it concise but compelling (2-3 short paragraphs, about 150-200 words).`;
             } else {
-                prompt = `Why is "${concept}" important to learn? What are the practical benefits, real-world applications, and how does it connect to other important areas of knowledge?`;
+                prompt = `Why is "${concept}" important to learn? What are the key practical benefits, real-world applications, and how does it connect to other important areas? Keep it concise but compelling (2-3 short paragraphs, about 150-200 words).`;
             }
         } else { // overview
             if (learningPath.length > 0) {
@@ -185,9 +187,9 @@ Why is "${concept}" important to understand, especially in the context of my lea
 
 I want to understand: "${concept}"
 
-Please provide a comprehensive overview of "${concept}" that's relevant to my learning journey toward ${learningPath[0]}. What are the key components, principles, and how does it work?`;
+Please provide a concise overview of "${concept}" that's relevant to my learning journey toward ${learningPath[0]}. What are the key components, principles, and how does it work? Keep it comprehensive but digestible (2-3 short paragraphs, about 150-200 words).`;
             } else {
-                prompt = `Please provide a comprehensive overview of "${concept}". What are the key components, principles, and how does it work? Help me understand what this concept is all about.`;
+                prompt = `Please provide a concise overview of "${concept}". What are the key components, principles, and how does it work? Help me understand what this concept is all about. Keep it comprehensive but digestible (2-3 short paragraphs, about 150-200 words).`;
             }
         }
 
@@ -379,6 +381,6 @@ app.listen(PORT, () => {
         console.warn('⚠️  WARNING: GEMINI_API_KEY environment variable is not set');
         console.log('   Please set your API key in a .env file');
     } else {
-        console.log('✅ Gemini API key configured');
+        console.log('✅ Gemini AI key configured');
     }
 });
