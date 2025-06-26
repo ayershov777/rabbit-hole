@@ -953,6 +953,34 @@ Return ONLY a JSON array of new concepts that expand the breadth.`;
             // .replace(/\. /g, '. ') // Ensure proper sentence spacing
             .trim();
     }
+
+    async recoverChatSession(concept, learningPath = [], userId = null) {
+        try {
+            // Create session key that matches the one used for chat
+            let sessionKey;
+            if (learningPath.length === 0) {
+                sessionKey = `${userId || 'anonymous'}_chat_root_${concept.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            } else {
+                sessionKey = `${userId || 'anonymous'}_chat_${learningPath.join(' -> ')}`;
+            }
+
+            console.log(`Checking for existing chat session: ${sessionKey}`);
+
+            // Check if session exists
+            if (this.chatSessions.has(sessionKey)) {
+                console.log(`Found existing chat session: ${sessionKey}`);
+                this.chatSessions.get(sessionKey).lastUsed = Date.now();
+                return { exists: true, sessionKey };
+            } else {
+                console.log(`No existing chat session found: ${sessionKey}`);
+                return { exists: false, sessionKey };
+            }
+
+        } catch (error) {
+            console.error('Error recovering chat session:', error);
+            return { exists: false, sessionKey: null };
+        }
+    }
 }
 
 module.exports = AIService;

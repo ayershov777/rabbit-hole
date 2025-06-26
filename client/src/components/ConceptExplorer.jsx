@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Container, Alert } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { MainInput } from './MainInput';
@@ -18,6 +18,10 @@ export const ConceptExplorer = () => {
     const [loadingOverview, setLoadingOverview] = useState(false);
     const [loadingResearchGuide, setLoadingResearchGuide] = useState(false);
     const [activeTab, setActiveTab] = useState(0);
+
+    // Chat state management
+    const [chatMessages, setChatMessages] = useState({});
+    const [chatInitialized, setChatInitialized] = useState({});
 
     // Content cache for summary, overview, and research guide
     const [contentStateCache] = useState(new Map());
@@ -68,6 +72,11 @@ export const ConceptExplorer = () => {
         return `${action}_${conceptText}_${learningPath.join('->')}`;
     };
 
+    // Generate chat cache key
+    const generateChatCacheKey = (conceptText, learningPath) => {
+        return `chat_${conceptText}_${learningPath.join('->')}`;
+    };
+
     // Save content state to cache
     const saveContentStateToCache = (conceptText, learningPath) => {
         const cacheKey = generateContentCacheKey(conceptText, 'state', learningPath);
@@ -83,6 +92,28 @@ export const ConceptExplorer = () => {
     const loadContentStateFromCache = (conceptText, learningPath) => {
         const cacheKey = generateContentCacheKey(conceptText, 'state', learningPath);
         return contentStateCache.get(cacheKey);
+    };
+
+    // Save chat state to cache
+    const saveChatStateToCache = (conceptText, learningPath, messages, initialized) => {
+        const cacheKey = generateChatCacheKey(conceptText, learningPath);
+        setChatMessages(prev => ({
+            ...prev,
+            [cacheKey]: messages
+        }));
+        setChatInitialized(prev => ({
+            ...prev,
+            [cacheKey]: initialized
+        }));
+    };
+
+    // Load chat state from cache
+    const loadChatStateFromCache = (conceptText, learningPath) => {
+        const cacheKey = generateChatCacheKey(conceptText, learningPath);
+        return {
+            messages: chatMessages[cacheKey] || [],
+            initialized: chatInitialized[cacheKey] || false
+        };
     };
 
     // Clear content state
@@ -244,6 +275,10 @@ export const ConceptExplorer = () => {
                     await loadTabContent('research_guide', currentConcept, learningPath);
                 }
                 break;
+
+            case 'chat':
+                // Chat state will be handled by ChatInterface
+                break;
         }
     };
 
@@ -275,6 +310,48 @@ export const ConceptExplorer = () => {
         setActiveTab(3); // Switch to chat tab
     };
 
+    const handleChatStateChange = useCallback((messages, initialized) => {
+        const currentConcept = currentBreakdown?.concept || currentContent?.concept;
+        if (!currentConcept) return;
+
+        const learningPath = breakdownHistory.slice(0, currentHistoryIndex + 1).map(item => item.concept);
+        const cacheKey = generateChatCacheKey(currentConcept, learningPath);
+
+        // Only update cache if the state has actually changed
+        const currentCached = loadChatStateFromCache(currentConcept, learningPath);
+        const messagesChanged = JSON.stringify(currentCached.messages) !== JSON.stringify(messages);
+        const initializedChanged = currentCached.initialized !== initialized;
+
+        if (messagesChanged || initializedChanged) {
+            console.log(`Updating chat cache for ${currentConcept}:`, {
+                cacheKey,
+                messageCount: messages.length,
+                initialized,
+                messagesChanged,
+                initializedChanged
+            });
+            saveChatStateToCache(currentConcept, learningPath, messages, initialized);
+        }
+    }, [currentBreakdown?.concept, currentContent?.concept, currentHistoryIndex, breakdownHistory]);
+
+    const getCurrentChatState = useCallback(() => {
+        const currentConcept = currentBreakdown?.concept || currentContent?.concept;
+        if (!currentConcept) return { messages: [], initialized: false };
+
+        const learningPath = breakdownHistory.slice(0, currentHistoryIndex + 1).map(item => item.concept);
+        const cached = loadChatStateFromCache(currentConcept, learningPath);
+
+        // Add some logging to help debug
+        const cacheKey = generateChatCacheKey(currentConcept, learningPath);
+        console.log(`Getting chat state for ${currentConcept}:`, {
+            cacheKey,
+            hasMessages: cached.messages.length > 0,
+            initialized: cached.initialized
+        });
+
+        return cached;
+    }, [currentBreakdown?.concept, currentContent?.concept, currentHistoryIndex, breakdownHistory, chatMessages, chatInitialized]);
+
     const startBreakdown = async () => {
         if (!concept.trim()) {
             setError('Please enter a concept to explore');
@@ -286,6 +363,10 @@ export const ConceptExplorer = () => {
 
         // Clear content cache for fresh start
         contentStateCache.clear();
+
+        // Clear chat state for fresh start
+        setChatMessages({});
+        setChatInitialized({});
 
         // Clear ALL chat history on server for completely fresh start
         try {
@@ -382,6 +463,7 @@ export const ConceptExplorer = () => {
                     loadingOverview={loadingOverview}
                     loadingResearchGuide={loadingResearchGuide}
                     activeTab={activeTab}
+                    currentChatState={getCurrentChatState()}
                     onNavigateHistory={handleBreadcrumbNavigate}
                     onOptionClick={handleBreakdownItemClick}
                     onActionSelect={handleActionSelect}
@@ -391,6 +473,7 @@ export const ConceptExplorer = () => {
                     onMoreClick={handleMoreConcepts}
                     onTabChange={handleTabChange}
                     onStartChat={handleStartChat}
+                    onChatStateChange={handleChatStateChange}
                 />
             )}
         </Container>

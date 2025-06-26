@@ -184,6 +184,31 @@ router.post('/chat/message', optionalAuth, async (req, res) => {
     }
 });
 
+// API endpoint for chat session recovery
+router.post('/chat/recover', optionalAuth, async (req, res) => {
+    try {
+        const { concept, learningPath = [] } = req.body;
+        const userId = req.user?._id;
+
+        if (!concept) {
+            return res.status(400).json({ error: 'Concept is required' });
+        }
+
+        console.log(`Recovering chat session for: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
+
+        const result = await aiService.recoverChatSession(concept, learningPath, userId);
+
+        res.json(result);
+
+    } catch (error) {
+        console.error('Error in /api/chat/recover:', error);
+        res.status(500).json({
+            error: 'Failed to recover chat session',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
 // Health check endpoint
 router.get('/health', (req, res) => {
     res.json({

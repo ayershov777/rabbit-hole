@@ -12,11 +12,18 @@ import {
 import { Send, MessageCircle, User, Bot } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-export const ChatInterface = ({ concept, learningPath, onContentAction }) => {
-    const [messages, setMessages] = useState([]);
+export const ChatInterface = ({
+    concept,
+    learningPath,
+    onContentAction,
+    initialMessages = [],
+    initialInitialized = false,
+    onStateChange
+}) => {
+    const [messages, setMessages] = useState(initialMessages);
     const [inputMessage, setInputMessage] = useState('');
     const [loading, setLoading] = useState(false);
-    const [chatInitialized, setChatInitialized] = useState(false);
+    const [chatInitialized, setChatInitialized] = useState(initialInitialized);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -27,21 +34,66 @@ export const ChatInterface = ({ concept, learningPath, onContentAction }) => {
         scrollToBottom();
     }, [messages]);
 
-    // Initialize chat with welcome message when component mounts or concept changes
+    // Initialize chat only if we don't have existing messages and haven't initialized
     useEffect(() => {
-        if (!chatInitialized) {
+        if (!chatInitialized && messages.length === 0) {
+            // First check if there's an existing session on the server
+            checkForExistingSession();
+        }
+    }, [concept, learningPath, chatInitialized, messages.length]);
+
+    const checkForExistingSession = async () => {
+        try {
+            const response = await fetch('/api/chat/recover', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    concept,
+                    learningPath
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.exists) {
+                    console.log(`Found existing server session for ${concept}`);
+                    // Session exists on server, just mark as initialized to avoid creating a new welcome message
+                    setChatInitialized(true);
+                } else {
+                    console.log(`No existing server session for ${concept}, initializing new chat`);
+                    // No session exists, initialize normally
+                    initializeChat();
+                }
+            } else {
+                // If recovery fails, proceed with normal initialization
+                initializeChat();
+            }
+        } catch (error) {
+            console.error('Error checking for existing session:', error);
+            // If recovery fails, proceed with normal initialization
             initializeChat();
         }
-    }, [concept, learningPath, chatInitialized]);
+    };
 
-    // Reset chat when concept/path changes
+    // Update parent when state changes
     useEffect(() => {
-        setMessages([]);
-        setChatInitialized(false);
-        setInputMessage('');
-    }, [concept, JSON.stringify(learningPath)]);
+        onStateChange?.(messages, chatInitialized);
+    }, [messages, chatInitialized, onStateChange]);
+
+    // When initialMessages or initialInitialized change, update local state
+    useEffect(() => {
+        setMessages(initialMessages);
+        setChatInitialized(initialInitialized);
+    }, [initialMessages, initialInitialized]);
 
     const initializeChat = async () => {
+        // Don't initialize if we already have messages
+        if (messages.length > 0) {
+            return;
+        }
+
         setLoading(true);
         try {
             const response = await fetch('/api/chat/initialize', {
@@ -57,23 +109,25 @@ export const ChatInterface = ({ concept, learningPath, onContentAction }) => {
 
             if (response.ok) {
                 const data = await response.json();
-                setMessages([{
+                const welcomeMessage = {
                     id: 1,
                     role: 'assistant',
                     content: data.welcomeMessage,
                     timestamp: new Date()
-                }]);
+                };
+                setMessages([welcomeMessage]);
                 setChatInitialized(true);
             }
         } catch (error) {
             console.error('Error initializing chat:', error);
             // Fallback welcome message
-            setMessages([{
+            const fallbackMessage = {
                 id: 1,
                 role: 'assistant',
                 content: `Hello! I'm here to help you learn about **${concept}**. What would you like to know? Feel free to ask me anything about this topic!`,
                 timestamp: new Date()
-            }]);
+            };
+            setMessages([fallbackMessage]);
             setChatInitialized(true);
         } finally {
             setLoading(false);
@@ -90,7 +144,8 @@ export const ChatInterface = ({ concept, learningPath, onContentAction }) => {
             timestamp: new Date()
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        const newMessages = [...messages, userMessage];
+        setMessages(newMessages);
         setInputMessage('');
         setLoading(true);
 
@@ -111,24 +166,24 @@ export const ChatInterface = ({ concept, learningPath, onContentAction }) => {
             if (response.ok) {
                 const data = await response.json();
                 const assistantMessage = {
-                    id: messages.length + 2,
+                    id: newMessages.length + 1,
                     role: 'assistant',
                     content: data.response,
                     timestamp: new Date()
                 };
-                setMessages(prev => [...prev, assistantMessage]);
+                setMessages([...newMessages, assistantMessage]);
             } else {
                 throw new Error('Failed to get response');
             }
         } catch (error) {
             console.error('Error sending message:', error);
             const errorMessage = {
-                id: messages.length + 2,
+                id: newMessages.length + 1,
                 role: 'assistant',
                 content: 'I apologize, but I encountered an error. Please try asking your question again.',
                 timestamp: new Date()
             };
-            setMessages(prev => [...prev, errorMessage]);
+            setMessages([...newMessages, errorMessage]);
         } finally {
             setLoading(false);
         }

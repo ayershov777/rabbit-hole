@@ -26,6 +26,7 @@ export const ResultsSection = ({
     loadingOverview,
     loadingResearchGuide,
     activeTab: controlledActiveTab,
+    currentChatState, // New prop for chat persistence
     onNavigateHistory,
     onOptionClick,
     onActionSelect,
@@ -34,7 +35,8 @@ export const ResultsSection = ({
     onContentAction,
     onMoreClick,
     onTabChange,
-    onStartChat  // New prop
+    onStartChat,
+    onChatStateChange // New prop for chat state updates
 }) => {
     const [activeTab, setActiveTab] = useState(controlledActiveTab || 0);
 
@@ -281,9 +283,13 @@ export const ResultsSection = ({
                     {/* Chat Tab */}
                     <TabPanel value={activeTab} index={3}>
                         <ChatInterface
+                            key={`${getCurrentConcept()}_${breakdownHistory.slice(0, currentHistoryIndex + 1).map(item => item.concept).join('→')}`}
                             concept={getCurrentConcept()}
                             learningPath={breakdownHistory.slice(0, currentHistoryIndex + 1).map(item => item.concept)}
                             onContentAction={onContentAction}
+                            initialMessages={currentChatState.messages}
+                            initialInitialized={currentChatState.initialized}
+                            onStateChange={onChatStateChange}
                         />
                     </TabPanel>
                 </Box>
