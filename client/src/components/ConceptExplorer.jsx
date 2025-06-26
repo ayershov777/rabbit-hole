@@ -271,6 +271,10 @@ export const ConceptExplorer = () => {
         goBackToHistory(index);
     };
 
+    const handleStartChat = () => {
+        setActiveTab(3); // Switch to chat tab
+    };
+
     const startBreakdown = async () => {
         if (!concept.trim()) {
             setError('Please enter a concept to explore');
@@ -386,6 +390,7 @@ export const ConceptExplorer = () => {
                     onContentAction={(concept, action) => getContent(concept, action, false)}
                     onMoreClick={handleMoreConcepts}
                     onTabChange={handleTabChange}
+                    onStartChat={handleStartChat}
                 />
             )}
         </Container>

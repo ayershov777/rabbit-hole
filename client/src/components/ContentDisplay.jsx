@@ -1,5 +1,5 @@
 import { Box, Typography, Divider, Grid, Button } from '@mui/material';
-import { FileText, TrendingUp, BookOpen } from 'lucide-react';
+import { FileText, TrendingUp, BookOpen, MessageCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const actionButtons = [
@@ -26,7 +26,7 @@ const actionButtons = [
     }
 ];
 
-export const ContentDisplay = ({ content, onActionSelect, hideActions = false }) => {
+export const ContentDisplay = ({ content, onActionSelect, onStartChat, hideActions = false }) => {
     return (
         <Box sx={{ mt: 2 }}>
             <Box
@@ -318,7 +318,37 @@ export const ContentDisplay = ({ content, onActionSelect, hideActions = false })
                 </ReactMarkdown>
             </Box>
 
-            {/* Action Buttons for Content Views */}
+            {/* Ask a Question Button - Show regardless of hideActions */}
+            {onStartChat && (
+                <Box sx={{ mt: 4, textAlign: 'center' }}>
+                    <Button
+                        variant="contained"
+                        onClick={onStartChat}
+                        startIcon={<MessageCircle size={18} />}
+                        sx={{
+                            background: '#0066ff',
+                            border: '2px solid #0066ff',
+                            color: '#fafafa',
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            borderRadius: 2,
+                            px: 4,
+                            py: 1.5,
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                                background: '#0052cc',
+                                borderColor: '#0052cc',
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 12px rgba(0, 102, 255, 0.3)'
+                            }
+                        }}
+                    >
+                        Ask a Question
+                    </Button>
+                </Box>
+            )}
+
+            {/* Action Buttons for Content Views - Only show when hideActions is false */}
             {!hideActions && <>
                 <Divider sx={{ my: 4 }} />
 

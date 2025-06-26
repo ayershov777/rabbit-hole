@@ -75,20 +75,27 @@ Example: {"concept1": "importance text", "concept2": "importance text"}`;
     }
 
     createOverviewSystemPrompt() {
-        return `You are an expert educational assistant that provides clear, comprehensive overviews of concepts and sub-concepts. Your goal is to give learners a solid understanding of what the concept encompasses, its key aspects, and how it works.
+        return `You are an expert educational assistant that provides clear, accessible overviews of concepts. Your goal is to give learners a simple understanding of what the concept encompasses, followed by answers to common questions.
 
 Rules:
-1. Provide a clear, well-structured overview of the concept
-2. Include the main components, principles, or aspects that define it
-3. Explain what this concept covers and its scope
-4. Use accessible language appropriate for someone learning this topic
-5. Include relevant examples or applications when helpful
+1. Start with ONE brief paragraph (60-80 words) that simply explains what the concept is and what it encompasses
+2. Use simple, everyday language - avoid jargon and technical terms
+3. Follow with a "Frequently Asked Questions" section containing 4-6 relevant Q&A pairs
+4. Make questions practical and relatable - what would someone actually wonder about this topic?
+5. Keep answers concise but informative (2-3 sentences each)
 6. Consider the learning path context to provide appropriate depth
-7. Focus on comprehensive understanding of the concept's breadth
-8. Keep it thorough but digestible - aim for 2-3 short paragraphs maximum
-9. Be specific about what this concept includes and covers
+7. Focus on helping someone understand the basics before diving deeper
 
-Format: Return a well-organized explanation (2-3 paragraphs, about 150-200 words) that gives a thorough but concise overview of what the concept encompasses.`;
+Format: 
+- Brief overview paragraph
+- ## Frequently Asked Questions
+- **Q: [Question]**  
+  A: [Answer]
+- **Q: [Question]**  
+  A: [Answer]
+[Continue with 4-6 total Q&A pairs]
+
+Make it comprehensive but digestible, perfect for someone just starting to learn about this concept.`;
     }
 
     createSummarySystemPrompt() {
@@ -116,6 +123,29 @@ Rules:
 5. Consider the learning path context to provide targeted guidance
 
 Format: Return a comprehensive research guide organized with clear headings and actionable steps that learners can follow to master the concept systematically.`;
+    }
+
+    createChatSystemPrompt(concept, learningPath) {
+        let contextInfo = '';
+        if (learningPath.length > 1) {
+            contextInfo = ` The user is learning about "${concept}" as part of their broader study of "${learningPath[0]}" (learning path: ${learningPath.join(' → ')}).`;
+        } else if (learningPath.length === 1) {
+            contextInfo = ` The user is studying "${concept}".`;
+        }
+
+        return `You are an expert educational assistant specializing in "${concept}".${contextInfo} Your goal is to help the user understand this topic by answering their questions clearly and engagingly.
+
+Guidelines:
+1. Provide clear, accurate explanations tailored to the user's level
+2. Use examples and analogies when helpful
+3. Break down complex concepts into digestible parts
+4. Encourage further questions and exploration
+5. If asked about topics outside "${concept}", gently redirect to relevant aspects
+6. Be conversational but informative
+7. Use markdown formatting for better readability
+8. Keep responses focused and practical
+
+Context: You are specifically helping someone learn about "${concept}"${learningPath.length > 1 ? ` in the context of ${learningPath[0]}` : ''}.`;
     }
 
     async generateBreakdownWithPriorities(concept, learningPath = [], userId = null) {
@@ -623,6 +653,115 @@ Return ONLY a JSON array of new concepts that expand the breadth.`;
 
         } catch (error) {
             console.error('Error generating more breakdown:', error);
+            throw error;
+        }
+    }
+
+    async initializeChat(concept, learningPath = [], userId = null) {
+        try {
+            const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+
+            // Create unique session key for chat
+            let sessionKey;
+            if (learningPath.length === 0) {
+                sessionKey = `${userId || 'anonymous'}_chat_root_${concept.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            } else {
+                sessionKey = `${userId || 'anonymous'}_chat_${learningPath.join(' -> ')}`;
+            }
+
+            console.log(`Creating new chat session: ${sessionKey}`);
+
+            const chatSession = model.startChat({
+                history: [
+                    {
+                        role: 'user',
+                        parts: [{ text: this.createChatSystemPrompt(concept, learningPath) }]
+                    },
+                    {
+                        role: 'model',
+                        parts: [{ text: `I understand. I'm here to help you learn about "${concept}"${learningPath.length > 1 ? ` in the context of ${learningPath[0]}` : ''}. I'll provide clear explanations, examples, and answer any questions you have about this topic.` }]
+                    }
+                ]
+            });
+
+            this.chatSessions.set(sessionKey, {
+                chat: chatSession,
+                lastUsed: Date.now(),
+                userId: userId,
+                concept: concept,
+                learningPath: [...learningPath],
+                type: 'chat'
+            });
+
+            // Generate welcome message
+            let welcomePrompt;
+            if (learningPath.length > 1) {
+                welcomePrompt = `Generate a friendly welcome message for someone who wants to learn about "${concept}" as part of their study of ${learningPath[0]}. Ask how you can help them understand this topic better. Keep it brief (2-3 sentences) and encouraging.`;
+            } else {
+                welcomePrompt = `Generate a friendly welcome message for someone who wants to learn about "${concept}". Ask how you can help them understand this topic better. Keep it brief (2-3 sentences) and encouraging.`;
+            }
+
+            const result = await chatSession.sendMessage(welcomePrompt);
+            const response = await result.response;
+            return response.text();
+
+        } catch (error) {
+            console.error('Error initializing chat:', error);
+            // Fallback message
+            return `Hello! I'm here to help you learn about **${concept}**. What would you like to know? Feel free to ask me anything about this topic!`;
+        }
+    }
+
+    async processChatMessage(concept, learningPath = [], message, conversationHistory = [], userId = null) {
+        try {
+            // Create session key
+            let sessionKey;
+            if (learningPath.length === 0) {
+                sessionKey = `${userId || 'anonymous'}_chat_root_${concept.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            } else {
+                sessionKey = `${userId || 'anonymous'}_chat_${learningPath.join(' -> ')}`;
+            }
+
+            let chatSession;
+
+            if (this.chatSessions.has(sessionKey)) {
+                chatSession = this.chatSessions.get(sessionKey).chat;
+                this.chatSessions.get(sessionKey).lastUsed = Date.now();
+                console.log(`Using existing chat session: ${sessionKey}`);
+            } else {
+                // Create new session if it doesn't exist
+                console.log(`Creating new chat session: ${sessionKey}`);
+                const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+
+                chatSession = model.startChat({
+                    history: [
+                        {
+                            role: 'user',
+                            parts: [{ text: this.createChatSystemPrompt(concept, learningPath) }]
+                        },
+                        {
+                            role: 'model',
+                            parts: [{ text: `I understand. I'm here to help you learn about "${concept}"${learningPath.length > 1 ? ` in the context of ${learningPath[0]}` : ''}. I'll provide clear explanations, examples, and answer any questions you have about this topic.` }]
+                        }
+                    ]
+                });
+
+                this.chatSessions.set(sessionKey, {
+                    chat: chatSession,
+                    lastUsed: Date.now(),
+                    userId: userId,
+                    concept: concept,
+                    learningPath: [...learningPath],
+                    type: 'chat'
+                });
+            }
+
+            const result = await chatSession.sendMessage(message);
+            const response = await result.response;
+            return response.text();
+
+        } catch (error) {
+            console.error('Error processing chat message:', error);
             throw error;
         }
     }

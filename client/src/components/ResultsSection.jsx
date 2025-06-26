@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Paper, Box, Typography, Tabs, Tab, CircularProgress } from '@mui/material';
-import { Info, TrendingUp, BookOpen } from 'lucide-react';
+import { Info, TrendingUp, BookOpen, MessageCircle } from 'lucide-react';
 import { BreadcrumbNavigation } from './BreadcrumbNavigation';
 import { BreakdownList } from './BreakdownList';
 import { ContentDisplay } from './ContentDisplay';
 import { TabPanel } from './TabPanel';
+import { ChatInterface } from './ChatInterface';
 
 export const ResultsSection = ({
     currentBreakdown,
@@ -32,7 +33,8 @@ export const ResultsSection = ({
     onBackToBreakdown,
     onContentAction,
     onMoreClick,
-    onTabChange
+    onTabChange,
+    onStartChat  // New prop
 }) => {
     const [activeTab, setActiveTab] = useState(controlledActiveTab || 0);
 
@@ -46,8 +48,13 @@ export const ResultsSection = ({
     const handleTabChange = (event, newValue) => {
         setActiveTab(newValue);
         // Notify parent about tab change
-        const actions = ['overview', 'breakdown', 'research_guide'];
+        const actions = ['overview', 'breakdown', 'research_guide', 'chat'];
         onTabChange(actions[newValue], newValue);
+    };
+
+    const handleStartChat = () => {
+        setActiveTab(3); // Switch to chat tab
+        onStartChat();
     };
 
     const getCurrentConcept = () => {
@@ -188,6 +195,13 @@ export const ResultsSection = ({
                             id="concept-tab-2"
                             aria-controls="concept-tabpanel-2"
                         />
+                        <Tab
+                            icon={<MessageCircle size={20} />}
+                            iconPosition="start"
+                            label="Chat"
+                            id="concept-tab-3"
+                            aria-controls="concept-tabpanel-3"
+                        />
                     </Tabs>
                 </Box>
 
@@ -206,6 +220,7 @@ export const ResultsSection = ({
                             <ContentDisplay
                                 content={{ content: overview, action: 'overview', concept: getCurrentConcept() }}
                                 onActionSelect={onContentAction}
+                                onStartChat={handleStartChat}
                                 hideActions={true}
                             />
                         ) : (
@@ -253,6 +268,7 @@ export const ResultsSection = ({
                             <ContentDisplay
                                 content={{ content: researchGuide, action: 'research_guide', concept: getCurrentConcept() }}
                                 onActionSelect={onContentAction}
+                                onStartChat={handleStartChat}
                                 hideActions={true}
                             />
                         ) : (
@@ -260,6 +276,15 @@ export const ResultsSection = ({
                                 Click to load the research guide for this concept.
                             </Typography>
                         )}
+                    </TabPanel>
+
+                    {/* Chat Tab */}
+                    <TabPanel value={activeTab} index={3}>
+                        <ChatInterface
+                            concept={getCurrentConcept()}
+                            learningPath={breakdownHistory.slice(0, currentHistoryIndex + 1).map(item => item.concept)}
+                            onContentAction={onContentAction}
+                        />
                     </TabPanel>
                 </Box>
             </Paper>

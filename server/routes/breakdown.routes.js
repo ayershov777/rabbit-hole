@@ -134,6 +134,56 @@ router.post('/more-concepts', optionalAuth, async (req, res) => {
     }
 });
 
+// API endpoint for chat initialization
+router.post('/chat/initialize', optionalAuth, async (req, res) => {
+    try {
+        const { concept, learningPath = [] } = req.body;
+        const userId = req.user?._id;
+
+        if (!concept) {
+            return res.status(400).json({ error: 'Concept is required' });
+        }
+
+        console.log(`Initializing chat for: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
+
+        const welcomeMessage = await aiService.initializeChat(concept, learningPath, userId);
+
+        res.json({ welcomeMessage });
+
+    } catch (error) {
+        console.error('Error in /api/chat/initialize:', error);
+        res.status(500).json({
+            error: 'Failed to initialize chat',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// API endpoint for chat messages
+router.post('/chat/message', optionalAuth, async (req, res) => {
+    try {
+        const { concept, learningPath = [], message, conversationHistory = [] } = req.body;
+        const userId = req.user?._id;
+
+        if (!concept || !message) {
+            return res.status(400).json({ error: 'Concept and message are required' });
+        }
+
+        console.log(`Chat message for: "${concept}" with learning path: [${learningPath.join(' → ')}] from user: ${userId || 'anonymous'}`);
+
+        const response = await aiService.processChatMessage(concept, learningPath, message, conversationHistory, userId);
+
+        res.json({ response });
+
+    } catch (error) {
+        console.error('Error in /api/chat/message:', error);
+        res.status(500).json({
+            error: 'Failed to process chat message',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
 // Health check endpoint
 router.get('/health', (req, res) => {
     res.json({
