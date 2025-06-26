@@ -192,7 +192,7 @@ export const ResultsSection = ({
                         <Tab
                             icon={<Info size={20} />}
                             iconPosition="start"
-                            label="Summary"
+                            label="Overview"
                             id="concept-tab-0"
                             aria-controls="concept-tabpanel-0"
                         />

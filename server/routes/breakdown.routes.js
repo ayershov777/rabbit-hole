@@ -58,7 +58,7 @@ router.post('/bulk-importance', optionalAuth, async (req, res) => {
 // API endpoint for content generation (overview, research_guide)
 router.post('/content', optionalAuth, async (req, res) => {
     try {
-        const { concept, action, learningPath = [] } = req.body;
+        const { concept, action, learningPath = [], summary } = req.body;
         const userId = req.user?._id;
 
         if (!concept) {
@@ -72,7 +72,7 @@ router.post('/content', optionalAuth, async (req, res) => {
 
         console.log(`Generating ${action} for: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
 
-        const content = await aiService.generateContent(concept, action, learningPath, userId);
+        const content = await aiService.generateContent(concept, action, learningPath, userId, summary);
         const cleanedContent = aiService.cleanContent(content);
 
         if (!cleanedContent || cleanedContent.length < 50) {

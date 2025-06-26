@@ -200,17 +200,24 @@ export const ConceptExplorer = () => {
         }
 
         try {
+            const requestBody = {
+                concept: conceptText,
+                learningPath: learningPath,
+                action: action
+            };
+
+            // Pass summary for overview to avoid repetition
+            if (action === 'overview' && summary) {
+                requestBody.summary = summary;
+            }
+
             const response = await fetch('/api/content', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     ...getAuthHeaders(),
                 },
-                body: JSON.stringify({
-                    concept: conceptText,
-                    learningPath: learningPath,
-                    action: action
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (response.ok) {

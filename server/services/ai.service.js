@@ -85,6 +85,7 @@ Rules:
 5. Keep answers concise but informative (2-3 sentences each)
 6. Consider the learning path context to provide appropriate depth
 7. Focus on helping someone understand the basics before diving deeper
+8. IMPORTANT: Do NOT repeat information that's already covered in the summary - the summary explains why this concept is important to the root breadcrumb, so focus your overview on what the concept IS and encompasses
 
 Format: 
 - Brief overview paragraph
@@ -330,7 +331,7 @@ Remember: This is completely independent of any previous requests.`;
         }
     }
 
-    async generateContent(concept, action, learningPath = [], userId = null) {
+    async generateContent(concept, action, learningPath = [], userId = null, summary = null) {
         try {
             const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
 
@@ -379,7 +380,7 @@ Remember: This is completely independent of any previous requests.`;
                                 text: `I understand. I will provide ${action === 'summary' ? 'extremely concise summaries (1-2 sentences, 40-60 words) in simple layman terms' :
                                     action === 'importance' ? 'extremely concise explanations (1-2 sentences, 30-50 words) of why sub-concepts are important components' :
                                         action === 'research_guide' ? 'comprehensive research guides (400-500 words) with structured learning paths, resources, and actionable steps' :
-                                            'comprehensive but concise overviews of concepts (2-3 short paragraphs, 150-200 words)'
+                                            'comprehensive but concise overviews of concepts (ONE paragraph before FAQ, about 60-80 words)'
                                     }, considering the learning context.`
                             }]
                         }
@@ -456,13 +457,27 @@ Make it actionable and specific to "${concept}". Use markdown formatting.`;
             } else { // overview
                 if (learningPath.length > 0) {
                     const pathString = learningPath.join(' → ');
+                    const summaryText = summary ? `Summary (why this concept is important to the root): "${summary}"` : '';
                     prompt = `Learning path so far: ${pathString}
+
+${summaryText}
 
 I want to understand: "${concept}"
 
-Please provide a comprehensive overview of "${concept}" and what it encompasses. What are the key aspects, principles, and scope of this area? How does it fit within ${learningPath[0]}? Keep it thorough but digestible (2-3 short paragraphs, about 150-200 words).`;
+Please provide a comprehensive overview of "${concept}" and what it encompasses. What are the key aspects, principles, and scope of this area? How does it fit within ${learningPath[0]}? 
+
+${summary ? 'IMPORTANT: The summary above explains why this concept is important to the root breadcrumb. Your overview should focus on what the concept IS and encompasses, not repeat the importance explanation.' : ''}
+
+Keep it thorough but digestible (ONE paragraph before FAQ, about 60-80 words).`;
                 } else {
-                    prompt = `Please provide a comprehensive overview of "${concept}". What does this field/area encompass? What are the key aspects, principles, and scope? What should someone expect to learn about in this area? Keep it thorough but digestible (2-3 short paragraphs, about 150-200 words).`;
+                    const summaryText = summary ? `Summary (why this concept is important): "${summary}"` : '';
+                    prompt = `${summaryText}
+
+Please provide a comprehensive overview of "${concept}". What does this field/area encompass? What are the key aspects, principles, and scope? What should someone expect to learn about in this area? 
+
+${summary ? 'IMPORTANT: The summary above explains why this concept is important. Your overview should focus on what the concept IS and encompasses, not repeat the importance explanation.' : ''}
+
+Keep it thorough but digestible (ONE paragraph before FAQ, about 60-80 words).`;
                 }
             }
 
