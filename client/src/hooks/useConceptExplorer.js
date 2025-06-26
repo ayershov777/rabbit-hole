@@ -1,18 +1,6 @@
 // client/src/hooks/useConceptExplorer.js
 import { useState, useCallback } from 'react';
 
-// Utility function to convert markdown to HTML
-const markdownToHtml = (text) => {
-    if (!text) return '';
-
-    return text
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/`(.*?)`/g, '<code>$1</code>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
-};
-
 const loadingMessages = [
     "Analyzing concept structure...",
     "Identifying key components...",
@@ -35,6 +23,13 @@ const actionLoadingMessages = {
         "Creating comprehensive overview...",
         "Structuring explanation...",
         "Finalizing overview content..."
+    ],
+    research_guide: [
+        "Analyzing learning pathways...",
+        "Identifying key resources...",
+        "Structuring study sequence...",
+        "Planning practical exercises...",
+        "Finalizing research guide..."
     ],
     more: [
         "Expanding concept breadth...",
@@ -372,7 +367,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
                 } else {
                     const newContent = {
                         concept: conceptText,
-                        content: markdownToHtml(data.content),
+                        content: data.content, // ← Keep raw markdown
                         action: action,
                         timestamp: Date.now()
                     };
@@ -493,11 +488,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
 
                     if (importanceResponse.ok) {
                         const importanceResult = await importanceResponse.json();
-                        const processedImportance = {};
-                        Object.entries(importanceResult.importance).forEach(([key, value]) => {
-                            processedImportance[key] = markdownToHtml(value);
-                        });
-                        setImportanceData(prev => ({ ...prev, ...processedImportance }));
+                        setImportanceData(importanceResult.importance);
                     }
                 } catch (importanceError) {
                     console.warn('Could not load importance explanations for new concepts:', importanceError);

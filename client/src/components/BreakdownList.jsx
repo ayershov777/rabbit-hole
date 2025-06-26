@@ -17,6 +17,7 @@ import {
     ChevronUp,
     FileText,
     TrendingUp,
+    BookOpen,
     Zap,
     Target,
     Compass,
@@ -37,6 +38,13 @@ const actionButtons = [
         label: 'Break It Down',
         icon: <TrendingUp size={18} />,
         color: '#ff6b35',
+        variant: 'outlined'
+    },
+    {
+        id: 'research_guide',
+        label: 'Research Guide',
+        icon: <BookOpen size={18} />,
+        color: '#6f42c1',
         variant: 'outlined'
     }
 ];

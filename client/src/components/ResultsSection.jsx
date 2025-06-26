@@ -30,6 +30,8 @@ export const ResultsSection = ({
         switch (currentContent.action) {
             case 'overview':
                 return `Overview of "${currentContent.concept}"`;
+            case 'research_guide':
+                return `Research Guide for "${currentContent.concept}"`;
             default:
                 return currentContent.concept;
         }
@@ -41,6 +43,8 @@ export const ResultsSection = ({
         switch (currentContent.action) {
             case 'overview':
                 return 'Key concepts and principles:';
+            case 'research_guide':
+                return 'Your comprehensive study roadmap:';
             default:
                 return '';
         }

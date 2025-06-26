@@ -55,7 +55,7 @@ router.post('/bulk-importance', optionalAuth, async (req, res) => {
     }
 });
 
-// API endpoint for content generation (overview)
+// API endpoint for content generation (overview, research_guide)
 router.post('/content', optionalAuth, async (req, res) => {
     try {
         const { concept, action, learningPath = [] } = req.body;
@@ -65,8 +65,9 @@ router.post('/content', optionalAuth, async (req, res) => {
             return res.status(400).json({ error: 'Concept is required' });
         }
 
-        if (!action || !['overview'].includes(action)) {
-            return res.status(400).json({ error: 'Valid action is required (overview)' });
+        // Updated to accept both overview and research_guide
+        if (!action || !['overview', 'research_guide'].includes(action)) {
+            return res.status(400).json({ error: 'Valid action is required (overview, research_guide)' });
         }
 
         console.log(`Generating ${action} for: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);

@@ -322,6 +322,19 @@ Remember: This is completely independent of any previous requests.`;
         }
     }
 
+    createResearchGuideSystemPrompt() {
+        return `You are an expert educational assistant that creates friendly research guides for learners.
+
+Rules:
+1. Keep it brief so the user can read it at a glance
+2. Focus on practical, actionable steps
+3. Suggest specific types of resources to look for (books, courses, articles, videos)
+4. Give a realistic time estimate using: minutes, hours, days, or weeks (don't specify a number)
+5. Consider the learning path context to provide targeted guidance
+
+Format: Return a comprehensive research guide organized with clear headings and actionable steps that learners can follow to master the concept systematically.`;
+    }
+
     async generateContent(concept, action, learningPath = [], userId = null) {
         try {
             const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
@@ -343,9 +356,18 @@ Remember: This is completely independent of any previous requests.`;
                 console.log(`Reusing content session: ${sessionKey}`);
             } else {
                 console.log(`Creating new content session: ${sessionKey}`);
-                const systemPrompt = action === 'importance'
-                    ? this.createImportanceSystemPrompt()
-                    : this.createOverviewSystemPrompt();
+                let systemPrompt;
+
+                switch (action) {
+                    case 'importance':
+                        systemPrompt = this.createImportanceSystemPrompt();
+                        break;
+                    case 'research_guide':
+                        systemPrompt = this.createResearchGuideSystemPrompt();
+                        break;
+                    default:
+                        systemPrompt = this.createOverviewSystemPrompt();
+                }
 
                 chatSession = model.startChat({
                     history: [
@@ -355,7 +377,7 @@ Remember: This is completely independent of any previous requests.`;
                         },
                         {
                             role: 'model',
-                            parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'extremely concise explanations (1-2 sentences, 30-50 words) of why sub-concepts are important components' : 'comprehensive but concise overviews of concepts (2-3 short paragraphs, 150-200 words)'}, considering the learning context.` }]
+                            parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'extremely concise explanations (1-2 sentences, 30-50 words) of why sub-concepts are important components' : action === 'research_guide' ? 'comprehensive research guides (400-500 words) with structured learning paths, resources, and actionable steps' : 'comprehensive but concise overviews of concepts (2-3 short paragraphs, 150-200 words)'}, considering the learning context.` }]
                         }
                     ]
                 });
@@ -384,6 +406,35 @@ Respond with 1-2 sentences maximum (30-50 words). Focus on its role and contribu
                     prompt = `Why is "${concept}" an important area to understand? 
 
 Respond with 1-2 sentences maximum (30-50 words). Focus on its significance and applications.`;
+                }
+            } else if (action === 'research_guide') {
+                if (learningPath.length > 0) {
+                    const pathString = learningPath.join(' → ');
+                    prompt = `Learning path so far: ${pathString}
+
+Create a comprehensive research guide for mastering "${concept}" in the context of learning ${learningPath[0]}. 
+
+Structure the guide with:
+1. **Learning Sequence** - Step-by-step progression from basics to advanced
+2. **Essential Resources** - Types of materials to seek out (books, courses, articles, videos)
+3. **Practical Application** - Hands-on exercises, projects, or real-world applications
+4. **Common Challenges** - Pitfalls to avoid and difficult concepts to watch for
+5. **Progress Assessment** - Ways to test understanding and measure progress
+6. **Time Estimates** - Realistic timeframes for different learning phases
+
+Make it actionable and specific to "${concept}" within the broader context of ${learningPath[0]}. Use markdown formatting.`;
+                } else {
+                    prompt = `Create a comprehensive research guide for mastering "${concept}". 
+
+Structure the guide with:
+1. **Learning Sequence** - Step-by-step progression from basics to advanced
+2. **Essential Resources** - Types of materials to seek out (books, courses, articles, videos)
+3. **Practical Application** - Hands-on exercises, projects, or real-world applications
+4. **Common Challenges** - Pitfalls to avoid and difficult concepts to watch for
+5. **Progress Assessment** - Ways to test understanding and measure progress
+6. **Time Estimates** - Realistic timeframes for different learning phases
+
+Make it actionable and specific to "${concept}". Use markdown formatting.`;
                 }
             } else { // overview
                 if (learningPath.length > 0) {
@@ -502,57 +553,57 @@ etc.`;
         }
     }
 
-async generateMoreBreakdown(concept, existingConcepts, learningPath = [], userId = null) {
-    try {
-        const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+    async generateMoreBreakdown(concept, existingConcepts, learningPath = [], userId = null) {
+        try {
+            const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
 
-        // Use the same session key as the original breakdown to maintain context
-        let sessionKey;
-        if (learningPath.length === 0) {
-            sessionKey = `${userId || 'anonymous'}_root_${concept.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-        } else {
-            sessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ')}`;
-        }
+            // Use the same session key as the original breakdown to maintain context
+            let sessionKey;
+            if (learningPath.length === 0) {
+                sessionKey = `${userId || 'anonymous'}_root_${concept.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            } else {
+                sessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ')}`;
+            }
 
-        let chatSession;
+            let chatSession;
 
-        // Try to use existing session to maintain context
-        if (this.chatSessions.has(sessionKey)) {
-            chatSession = this.chatSessions.get(sessionKey).chat;
-            this.chatSessions.get(sessionKey).lastUsed = Date.now();
-            console.log(`Using existing session for more concepts: ${sessionKey}`);
-        } else {
-            // If no session exists, create a new one with context
-            console.log(`Creating new session for more concepts: ${sessionKey}`);
-            chatSession = model.startChat({
-                history: [
-                    {
-                        role: 'user',
-                        parts: [{ text: this.createBreakdownSystemPrompt() }]
-                    },
-                    {
-                        role: 'model',
-                        parts: [{ text: 'I understand. I will help break down concepts into their detailed sub-concepts and components, responding only with JSON arrays of specific areas and aspects that make up the main concept. Each request is completely independent and I will not reference any previous concepts or discussions.' }]
-                    }
-                ]
-            });
+            // Try to use existing session to maintain context
+            if (this.chatSessions.has(sessionKey)) {
+                chatSession = this.chatSessions.get(sessionKey).chat;
+                this.chatSessions.get(sessionKey).lastUsed = Date.now();
+                console.log(`Using existing session for more concepts: ${sessionKey}`);
+            } else {
+                // If no session exists, create a new one with context
+                console.log(`Creating new session for more concepts: ${sessionKey}`);
+                chatSession = model.startChat({
+                    history: [
+                        {
+                            role: 'user',
+                            parts: [{ text: this.createBreakdownSystemPrompt() }]
+                        },
+                        {
+                            role: 'model',
+                            parts: [{ text: 'I understand. I will help break down concepts into their detailed sub-concepts and components, responding only with JSON arrays of specific areas and aspects that make up the main concept. Each request is completely independent and I will not reference any previous concepts or discussions.' }]
+                        }
+                    ]
+                });
 
-            this.chatSessions.set(sessionKey, {
-                chat: chatSession,
-                lastUsed: Date.now(),
-                userId: userId,
-                concept: concept,
-                learningPath: [...learningPath]
-            });
-        }
+                this.chatSessions.set(sessionKey, {
+                    chat: chatSession,
+                    lastUsed: Date.now(),
+                    userId: userId,
+                    concept: concept,
+                    learningPath: [...learningPath]
+                });
+            }
 
-        // Create prompt to expand breadth, not depth
-        let prompt;
-        const existingList = existingConcepts.map((item, i) => `${i + 1}. ${item}`).join('\n');
-        
-        if (learningPath.length > 0) {
-            const pathString = learningPath.join(' → ');
-            prompt = `Learning path: ${pathString}
+            // Create prompt to expand breadth, not depth
+            let prompt;
+            const existingList = existingConcepts.map((item, i) => `${i + 1}. ${item}`).join('\n');
+
+            if (learningPath.length > 0) {
+                const pathString = learningPath.join(' → ');
+                prompt = `Learning path: ${pathString}
 
 You previously provided these sub-concepts for "${concept}":
 ${existingList}
@@ -568,8 +619,8 @@ Focus on:
 Avoid duplicating or elaborating on the existing concepts. Expand horizontally, not vertically.
 
 Return ONLY a JSON array of new concepts that expand the breadth.`;
-        } else {
-            prompt = `You previously provided these sub-concepts for "${concept}":
+            } else {
+                prompt = `You previously provided these sub-concepts for "${concept}":
 ${existingList}
 
 Now expand the BREADTH of understanding for "${concept}". Provide additional sub-concepts, components, and detailed aspects that broaden the scope rather than going deeper into existing concepts.
@@ -583,17 +634,17 @@ Focus on:
 Avoid duplicating or elaborating on the existing concepts. Expand horizontally, not vertically.
 
 Return ONLY a JSON array of new concepts that expand the breadth.`;
+            }
+
+            const result = await chatSession.sendMessage(prompt);
+            const response = await result.response;
+            return response.text();
+
+        } catch (error) {
+            console.error('Error generating more breakdown:', error);
+            throw error;
         }
-
-        const result = await chatSession.sendMessage(prompt);
-        const response = await result.response;
-        return response.text();
-
-    } catch (error) {
-        console.error('Error generating more breakdown:', error);
-        throw error;
     }
-}
 
     parseBulkImportanceResponse(text, concepts) {
         const importanceMap = {};
@@ -742,7 +793,7 @@ Return ONLY a JSON array of new concepts that expand the breadth.`;
         return content
             .trim()
             .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newlines
-            .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+            .replace(/[ \t]+/g, ' ') // Replace multiple spaces/tabs with single space (but preserve newlines)
             .replace(/\. /g, '. ') // Ensure proper sentence spacing
             .trim();
     }
