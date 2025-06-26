@@ -485,6 +485,116 @@ etc.`;
         }
     }
 
+    async generateMoreConcepts(concept, existingConcepts, learningPath = [], userId = null) {
+        try {
+            // First, get more concepts
+            const moreBreakdownText = await this.generateMoreBreakdown(concept, existingConcepts, learningPath, userId);
+            const moreBreakdown = this.parseBreakdownResponse(moreBreakdownText);
+
+            // Then, evaluate priorities for the new concepts
+            const priorities = await this.evaluatePriorities(concept, moreBreakdown, learningPath, userId);
+
+            return { breakdown: moreBreakdown, priorities };
+
+        } catch (error) {
+            console.error('Error generating more concepts:', error);
+            throw error;
+        }
+    }
+
+async generateMoreBreakdown(concept, existingConcepts, learningPath = [], userId = null) {
+    try {
+        const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+
+        // Use the same session key as the original breakdown to maintain context
+        let sessionKey;
+        if (learningPath.length === 0) {
+            sessionKey = `${userId || 'anonymous'}_root_${concept.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        } else {
+            sessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ')}`;
+        }
+
+        let chatSession;
+
+        // Try to use existing session to maintain context
+        if (this.chatSessions.has(sessionKey)) {
+            chatSession = this.chatSessions.get(sessionKey).chat;
+            this.chatSessions.get(sessionKey).lastUsed = Date.now();
+            console.log(`Using existing session for more concepts: ${sessionKey}`);
+        } else {
+            // If no session exists, create a new one with context
+            console.log(`Creating new session for more concepts: ${sessionKey}`);
+            chatSession = model.startChat({
+                history: [
+                    {
+                        role: 'user',
+                        parts: [{ text: this.createBreakdownSystemPrompt() }]
+                    },
+                    {
+                        role: 'model',
+                        parts: [{ text: 'I understand. I will help break down concepts into their detailed sub-concepts and components, responding only with JSON arrays of specific areas and aspects that make up the main concept. Each request is completely independent and I will not reference any previous concepts or discussions.' }]
+                    }
+                ]
+            });
+
+            this.chatSessions.set(sessionKey, {
+                chat: chatSession,
+                lastUsed: Date.now(),
+                userId: userId,
+                concept: concept,
+                learningPath: [...learningPath]
+            });
+        }
+
+        // Create prompt to expand breadth, not depth
+        let prompt;
+        const existingList = existingConcepts.map((item, i) => `${i + 1}. ${item}`).join('\n');
+        
+        if (learningPath.length > 0) {
+            const pathString = learningPath.join(' → ');
+            prompt = `Learning path: ${pathString}
+
+You previously provided these sub-concepts for "${concept}":
+${existingList}
+
+Now expand the BREADTH of understanding for "${concept}" in the context of ${learningPath[0]}. Provide additional sub-concepts, components, and detailed aspects that broaden the scope rather than going deeper into existing concepts.
+
+Focus on:
+- Different areas or aspects not yet covered
+- Related components that expand the overall scope
+- Additional dimensions or facets of "${concept}"
+- Complementary areas that complete the picture
+
+Avoid duplicating or elaborating on the existing concepts. Expand horizontally, not vertically.
+
+Return ONLY a JSON array of new concepts that expand the breadth.`;
+        } else {
+            prompt = `You previously provided these sub-concepts for "${concept}":
+${existingList}
+
+Now expand the BREADTH of understanding for "${concept}". Provide additional sub-concepts, components, and detailed aspects that broaden the scope rather than going deeper into existing concepts.
+
+Focus on:
+- Different areas or aspects not yet covered
+- Related components that expand the overall scope
+- Additional dimensions or facets of "${concept}"
+- Complementary areas that complete the picture
+
+Avoid duplicating or elaborating on the existing concepts. Expand horizontally, not vertically.
+
+Return ONLY a JSON array of new concepts that expand the breadth.`;
+        }
+
+        const result = await chatSession.sendMessage(prompt);
+        const response = await result.response;
+        return response.text();
+
+    } catch (error) {
+        console.error('Error generating more breakdown:', error);
+        throw error;
+    }
+}
+
     parseBulkImportanceResponse(text, concepts) {
         const importanceMap = {};
         const lines = text.split('\n').filter(line => line.trim());

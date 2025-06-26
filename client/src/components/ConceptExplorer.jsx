@@ -28,6 +28,7 @@ export const ConceptExplorer = () => {
         contentCache,
         importanceData,
         priorityData,
+        loadingMore,
         setSelectedIndex,
         setExpandedIndex,
         setMenuButtonsReady,
@@ -37,7 +38,8 @@ export const ConceptExplorer = () => {
         goBackToBreakdown,
         handleOptionClick,
         handleMenuCollapse,
-        handleActionSelect
+        handleActionSelect,
+        handleMoreConcepts
     } = useConceptExplorer(getAuthHeaders, resultsHeaderRef);
 
     const { handleListboxKeyDown } = useKeyboardNavigation({
@@ -126,7 +128,7 @@ export const ConceptExplorer = () => {
             )}
 
             {/* Loading State */}
-            {loading && (
+            {(loading || loadingMore) && (
                 <LoadingState
                     loadingMessage={loadingMessage}
                     loadingProgress={loadingProgress}
@@ -145,6 +147,7 @@ export const ConceptExplorer = () => {
                     expandedIndex={expandedIndex}
                     importanceData={importanceData}
                     priorityData={priorityData}
+                    loadingMore={loadingMore}
                     resultsHeaderRef={resultsHeaderRef}
                     onNavigateHistory={goBackToHistory}
                     onOptionClick={handleOptionClick}
@@ -152,6 +155,7 @@ export const ConceptExplorer = () => {
                     onKeyDown={handleListboxKeyDown}
                     onBackToBreakdown={goBackToBreakdown}
                     onContentAction={(concept, action) => getContent(concept, action, false)}
+                    onMoreClick={handleMoreConcepts}
                 />
             )}
         </Container>

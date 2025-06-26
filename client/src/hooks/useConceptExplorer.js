@@ -1,3 +1,4 @@
+// client/src/hooks/useConceptExplorer.js
 import { useState, useCallback } from 'react';
 
 // Utility function to convert markdown to HTML
@@ -34,6 +35,13 @@ const actionLoadingMessages = {
         "Creating comprehensive overview...",
         "Structuring explanation...",
         "Finalizing overview content..."
+    ],
+    more: [
+        "Expanding concept breadth...",
+        "Finding additional areas...",
+        "Identifying related concepts...",
+        "Organizing new components...",
+        "Finalizing expanded breakdown..."
     ]
 };
 
@@ -53,6 +61,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
     const [contentCache, setContentCache] = useState(new Map());
     const [importanceData, setImportanceData] = useState({});
     const [priorityData, setPriorityData] = useState({});
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const getContentWithFreshState = useCallback(async (conceptText, action, freshState) => {
         console.log(`Getting fresh content for: "${conceptText}", action: ${action}`);
@@ -402,6 +411,123 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
         }
     }, [getAuthHeaders, resultsHeaderRef, breakdownHistory, currentHistoryIndex, contentCache]);
 
+    const handleMoreConcepts = useCallback(async () => {
+        if (!currentBreakdown) return;
+
+        const activePath = breakdownHistory.slice(0, currentHistoryIndex + 1);
+        const learningPath = activePath.filter(item => item && item.concept).map(item => item.concept);
+
+        console.log(`Getting more concepts for: "${currentBreakdown.concept}", learningPath: [${learningPath.join(', ')}]`);
+
+        setLoadingMore(true);
+        setLoadingProgress(0);
+
+        const messages = actionLoadingMessages.more;
+        setLoadingMessage(messages[0]);
+
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+            setLoadingProgress(prev => {
+                const newProgress = Math.min(prev + Math.random() * 20, 90);
+                const messageIndex = Math.floor((newProgress / 90) * (messages.length - 1));
+                setLoadingMessage(messages[messageIndex]);
+                return newProgress;
+            });
+        }, 800);
+
+        try {
+            const response = await fetch('/api/more-concepts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
+                },
+                body: JSON.stringify({
+                    concept: currentBreakdown.concept,
+                    existingConcepts: currentBreakdown.breakdown,
+                    learningPath: learningPath
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to get more concepts');
+            }
+
+            const data = await response.json();
+            setLoadingProgress(100);
+            setLoadingMessage("Complete!");
+
+            setTimeout(async () => {
+                // Merge new concepts with existing ones
+                const updatedBreakdown = {
+                    ...currentBreakdown,
+                    breakdown: [...currentBreakdown.breakdown, ...data.breakdown],
+                    priorities: { ...currentBreakdown.priorities, ...data.priorities },
+                    timestamp: Date.now()
+                };
+
+                setCurrentBreakdown(updatedBreakdown);
+                setPriorityData({ ...priorityData, ...data.priorities });
+
+                // Update the history
+                setBreakdownHistory(prev => {
+                    const newHistory = [...prev];
+                    newHistory[currentHistoryIndex] = updatedBreakdown;
+                    return newHistory;
+                });
+
+                // Generate importance explanations for new concepts
+                try {
+                    const importanceResponse = await fetch('/api/bulk-importance', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...getAuthHeaders(),
+                        },
+                        body: JSON.stringify({
+                            concepts: data.breakdown,
+                            learningPath: learningPath
+                        })
+                    });
+
+                    if (importanceResponse.ok) {
+                        const importanceResult = await importanceResponse.json();
+                        const processedImportance = {};
+                        Object.entries(importanceResult.importance).forEach(([key, value]) => {
+                            processedImportance[key] = markdownToHtml(value);
+                        });
+                        setImportanceData(prev => ({ ...prev, ...processedImportance }));
+                    }
+                } catch (importanceError) {
+                    console.warn('Could not load importance explanations for new concepts:', importanceError);
+                }
+
+                setLoadingMore(false);
+                clearInterval(progressInterval);
+
+                // Scroll to the first new concept
+                setTimeout(() => {
+                    const firstNewIndex = currentBreakdown.breakdown.length;
+                    const newElement = document.querySelector(`[data-option-index="${firstNewIndex}"]`);
+                    if (newElement) {
+                        newElement.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                    }
+                }, 100);
+
+            }, 500);
+
+        } catch (error) {
+            console.error('Error getting more concepts:', error);
+            setLoadingMore(false);
+            clearInterval(progressInterval);
+            throw error;
+        }
+    }, [getAuthHeaders, currentBreakdown, breakdownHistory, currentHistoryIndex, priorityData, importanceData]);
+
     const handleOptionClick = useCallback((option, index) => {
         setSelectedIndex(index);
         if (expandedIndex === index) {
@@ -470,6 +596,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
         contentCache,
         importanceData,
         priorityData,
+        loadingMore,
         // State setters
         setSelectedIndex,
         setExpandedIndex,
@@ -481,6 +608,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
         goBackToBreakdown,
         handleOptionClick,
         handleMenuCollapse,
-        handleActionSelect
+        handleActionSelect,
+        handleMoreConcepts
     };
 };

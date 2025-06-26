@@ -104,6 +104,35 @@ router.post('/clear-history', optionalAuth, (req, res) => {
     });
 });
 
+// API endpoint for getting more concepts (expanding breadth)
+router.post('/more-concepts', optionalAuth, async (req, res) => {
+    try {
+        const { concept, existingConcepts, learningPath = [] } = req.body;
+        const userId = req.user?._id;
+
+        if (!concept) {
+            return res.status(400).json({ error: 'Concept is required' });
+        }
+
+        if (!existingConcepts || !Array.isArray(existingConcepts)) {
+            return res.status(400).json({ error: 'Existing concepts array is required' });
+        }
+
+        console.log(`Getting more concepts for: "${concept}" with existing: [${existingConcepts.join(', ')}], learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
+
+        const { breakdown, priorities } = await aiService.generateMoreConcepts(concept, existingConcepts, learningPath, userId);
+
+        res.json({ breakdown, priorities });
+
+    } catch (error) {
+        console.error('Error in /api/more-concepts:', error);
+        res.status(500).json({
+            error: 'Failed to generate more concepts',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
 // Health check endpoint
 router.get('/health', (req, res) => {
     res.json({

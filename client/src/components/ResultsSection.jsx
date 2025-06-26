@@ -1,4 +1,3 @@
-import React from 'react';
 import { Paper, Box, Typography, Button } from '@mui/material';
 import { ArrowLeft } from 'lucide-react';
 import { BreadcrumbNavigation } from './BreadcrumbNavigation';
@@ -15,13 +14,15 @@ export const ResultsSection = ({
     expandedIndex,
     importanceData,
     priorityData,
+    loadingMore,
     resultsHeaderRef,
     onNavigateHistory,
     onOptionClick,
     onActionSelect,
     onKeyDown,
     onBackToBreakdown,
-    onContentAction
+    onContentAction,
+    onMoreClick
 }) => {
     const getContentTitle = () => {
         if (!currentContent) return '';
@@ -141,8 +142,10 @@ export const ResultsSection = ({
                             onOptionClick={onOptionClick}
                             onActionSelect={onActionSelect}
                             onKeyDown={onKeyDown}
+                            onMoreClick={onMoreClick}
                             importanceData={importanceData}
                             priorityData={priorityData}
+                            loadingMore={loadingMore}
                         />
                     )}
 

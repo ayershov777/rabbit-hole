@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import {
     Typography,
     List,
@@ -9,7 +9,8 @@ import {
     Grid,
     Button,
     Tooltip,
-    Chip
+    Chip,
+    Divider
 } from '@mui/material';
 import {
     ChevronDown,
@@ -19,7 +20,8 @@ import {
     Zap,
     Target,
     Compass,
-    Telescope
+    Telescope,
+    Plus
 } from 'lucide-react';
 
 const actionButtons = [
@@ -78,8 +80,10 @@ export const BreakdownList = ({
     onOptionClick,
     onActionSelect,
     onKeyDown,
+    onMoreClick,
     importanceData = {},
-    priorityData = {}
+    priorityData = {},
+    loadingMore = false
 }) => {
     const listboxRef = useRef(null);
 
@@ -384,6 +388,46 @@ export const BreakdownList = ({
                     );
                 })}
             </List>
+
+            {/* More Button */}
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+                <Divider sx={{ mb: 3 }} />
+                <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={onMoreClick}
+                    disabled={loadingMore}
+                    startIcon={<Plus size={20} />}
+                    sx={{
+                        border: '3px solid #6c757d',
+                        borderRadius: 2,
+                        color: '#6c757d',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        px: 4,
+                        py: 1.5,
+                        background: '#fafafa',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                            background: '#6c757d',
+                            color: '#fafafa',
+                            borderColor: '#6c757d',
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(108, 117, 125, 0.3)'
+                        },
+                        '&:disabled': {
+                            background: '#f5f5f5',
+                            borderColor: '#e9ecef',
+                            color: '#adb5bd'
+                        }
+                    }}
+                >
+                    {loadingMore ? 'Loading more concepts...' : 'Show More Concepts'}
+                </Button>
+                <Typography variant="body2" sx={{ mt: 1, color: '#6c757d', fontStyle: 'italic' }}>
+                    Expand the breadth of concepts at this level
+                </Typography>
+            </Box>
         </>
     );
 };
