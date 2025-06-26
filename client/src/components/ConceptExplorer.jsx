@@ -11,6 +11,16 @@ export const ConceptExplorer = () => {
     const { getAuthHeaders } = useAuth();
     const [concept, setConcept] = useState('');
     const [error, setError] = useState('');
+    const [summary, setSummary] = useState('');
+    const [overview, setOverview] = useState('');
+    const [researchGuide, setResearchGuide] = useState('');
+    const [loadingSummary, setLoadingSummary] = useState(false);
+    const [loadingOverview, setLoadingOverview] = useState(false);
+    const [loadingResearchGuide, setLoadingResearchGuide] = useState(false);
+    const [activeTab, setActiveTab] = useState(0);
+
+    // Content cache for summary, overview, and research guide
+    const [contentStateCache] = useState(new Map());
     const resultsHeaderRef = useRef(null);
 
     const {
@@ -53,6 +63,214 @@ export const ConceptExplorer = () => {
         handleActionSelect
     });
 
+    // Generate cache key for content
+    const generateContentCacheKey = (conceptText, action, learningPath) => {
+        return `${action}_${conceptText}_${learningPath.join('->')}`;
+    };
+
+    // Save content state to cache
+    const saveContentStateToCache = (conceptText, learningPath) => {
+        const cacheKey = generateContentCacheKey(conceptText, 'state', learningPath);
+        contentStateCache.set(cacheKey, {
+            summary,
+            overview,
+            researchGuide,
+            timestamp: Date.now()
+        });
+    };
+
+    // Load content state from cache
+    const loadContentStateFromCache = (conceptText, learningPath) => {
+        const cacheKey = generateContentCacheKey(conceptText, 'state', learningPath);
+        return contentStateCache.get(cacheKey);
+    };
+
+    // Clear content state
+    const clearContentState = () => {
+        setSummary('');
+        setOverview('');
+        setResearchGuide('');
+    };
+
+    // Load content for a specific concept
+    const loadContentForConcept = async (conceptText, learningPath) => {
+        // Check cache first
+        const cachedState = loadContentStateFromCache(conceptText, learningPath);
+        if (cachedState) {
+            setSummary(cachedState.summary || '');
+            setOverview(cachedState.overview || '');
+            setResearchGuide(cachedState.researchGuide || '');
+            return;
+        }
+
+        // If not in cache, clear state and load summary
+        clearContentState();
+
+        // Load summary by default
+        const summaryCacheKey = generateContentCacheKey(conceptText, 'summary', learningPath);
+        if (!contentStateCache.has(summaryCacheKey)) {
+            setLoadingSummary(true);
+            try {
+                const response = await fetch('/api/content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders(),
+                    },
+                    body: JSON.stringify({
+                        concept: conceptText,
+                        learningPath: learningPath,
+                        action: 'summary'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setSummary(data.content);
+                    contentStateCache.set(summaryCacheKey, data.content);
+                }
+            } catch (error) {
+                console.error('Error loading summary:', error);
+            } finally {
+                setLoadingSummary(false);
+            }
+        } else {
+            setSummary(contentStateCache.get(summaryCacheKey));
+        }
+
+        // Load content for active tab if needed
+        if (activeTab === 0) {
+            await loadTabContent('overview', conceptText, learningPath);
+        } else if (activeTab === 2) {
+            await loadTabContent('research_guide', conceptText, learningPath);
+        }
+    };
+
+    // Load content for a specific tab
+    const loadTabContent = async (action, conceptText, learningPath) => {
+        const cacheKey = generateContentCacheKey(conceptText, action, learningPath);
+
+        // Check cache first
+        if (contentStateCache.has(cacheKey)) {
+            const cachedContent = contentStateCache.get(cacheKey);
+            if (action === 'overview') {
+                setOverview(cachedContent);
+            } else if (action === 'research_guide') {
+                setResearchGuide(cachedContent);
+            }
+            return;
+        }
+
+        // Load from API
+        if (action === 'overview') {
+            setLoadingOverview(true);
+        } else if (action === 'research_guide') {
+            setLoadingResearchGuide(true);
+        }
+
+        try {
+            const response = await fetch('/api/content', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
+                },
+                body: JSON.stringify({
+                    concept: conceptText,
+                    learningPath: learningPath,
+                    action: action
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                contentStateCache.set(cacheKey, data.content);
+
+                if (action === 'overview') {
+                    setOverview(data.content);
+                } else if (action === 'research_guide') {
+                    setResearchGuide(data.content);
+                }
+            }
+        } catch (error) {
+            console.error(`Error loading ${action}:`, error);
+        } finally {
+            if (action === 'overview') {
+                setLoadingOverview(false);
+            } else if (action === 'research_guide') {
+                setLoadingResearchGuide(false);
+            }
+        }
+    };
+
+    // Load content when current concept changes
+    useEffect(() => {
+        const currentConcept = currentBreakdown?.concept || currentContent?.concept;
+        if (!currentConcept) return;
+
+        const learningPath = breakdownHistory.slice(0, currentHistoryIndex).map(item => item.concept);
+
+        // Save current state before loading new content
+        const previousConcept = breakdownHistory[currentHistoryIndex - 1]?.concept;
+        if (previousConcept && (summary || overview || researchGuide)) {
+            const previousPath = breakdownHistory.slice(0, currentHistoryIndex - 1).map(item => item.concept);
+            saveContentStateToCache(previousConcept, previousPath);
+        }
+
+        loadContentForConcept(currentConcept, learningPath);
+    }, [currentBreakdown?.concept, currentContent?.concept, currentHistoryIndex]);
+
+    const handleTabChange = async (action, tabIndex) => {
+        setActiveTab(tabIndex);
+
+        const currentConcept = currentBreakdown?.concept || currentContent?.concept;
+        if (!currentConcept) return;
+
+        const learningPath = breakdownHistory.slice(0, currentHistoryIndex).map(item => item.concept);
+
+        switch (action) {
+            case 'overview':
+                if (!overview) {
+                    await loadTabContent('overview', currentConcept, learningPath);
+                }
+                break;
+
+            case 'breakdown':
+                // Breakdown is already loaded
+                break;
+
+            case 'research_guide':
+                if (!researchGuide) {
+                    await loadTabContent('research_guide', currentConcept, learningPath);
+                }
+                break;
+        }
+    };
+
+    const handleBreakdownItemClick = (option) => {
+        // Save current content state before navigating
+        const currentConcept = currentBreakdown?.concept;
+        if (currentConcept) {
+            const learningPath = breakdownHistory.slice(0, currentHistoryIndex).map(item => item.concept);
+            saveContentStateToCache(currentConcept, learningPath);
+        }
+
+        // Get the breakdown for the selected concept
+        getContent(option, 'breakdown', false);
+    };
+
+    const handleBreadcrumbNavigate = (index) => {
+        // Save current content state before navigating
+        const currentConcept = currentBreakdown?.concept;
+        if (currentConcept) {
+            const learningPath = breakdownHistory.slice(0, currentHistoryIndex).map(item => item.concept);
+            saveContentStateToCache(currentConcept, learningPath);
+        }
+
+        // Navigate to the selected history item
+        goBackToHistory(index);
+    };
+
     const startBreakdown = async () => {
         if (!concept.trim()) {
             setError('Please enter a concept to explore');
@@ -60,6 +278,10 @@ export const ConceptExplorer = () => {
         }
 
         setError('');
+        clearContentState();
+
+        // Clear content cache for fresh start
+        contentStateCache.clear();
 
         // Clear ALL chat history on server for completely fresh start
         try {
@@ -149,13 +371,21 @@ export const ConceptExplorer = () => {
                     priorityData={priorityData}
                     loadingMore={loadingMore}
                     resultsHeaderRef={resultsHeaderRef}
-                    onNavigateHistory={goBackToHistory}
-                    onOptionClick={handleOptionClick}
+                    summary={summary}
+                    overview={overview}
+                    researchGuide={researchGuide}
+                    loadingSummary={loadingSummary}
+                    loadingOverview={loadingOverview}
+                    loadingResearchGuide={loadingResearchGuide}
+                    activeTab={activeTab}
+                    onNavigateHistory={handleBreadcrumbNavigate}
+                    onOptionClick={handleBreakdownItemClick}
                     onActionSelect={handleActionSelect}
                     onKeyDown={handleListboxKeyDown}
                     onBackToBreakdown={goBackToBreakdown}
                     onContentAction={(concept, action) => getContent(concept, action, false)}
                     onMoreClick={handleMoreConcepts}
+                    onTabChange={handleTabChange}
                 />
             )}
         </Container>

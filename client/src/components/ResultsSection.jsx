@@ -1,8 +1,10 @@
-import { Paper, Box, Typography, Button } from '@mui/material';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Paper, Box, Typography, Tabs, Tab, CircularProgress } from '@mui/material';
+import { Info, TrendingUp, BookOpen } from 'lucide-react';
 import { BreadcrumbNavigation } from './BreadcrumbNavigation';
 import { BreakdownList } from './BreakdownList';
 import { ContentDisplay } from './ContentDisplay';
+import { TabPanel } from './TabPanel';
 
 export const ResultsSection = ({
     currentBreakdown,
@@ -16,38 +18,54 @@ export const ResultsSection = ({
     priorityData,
     loadingMore,
     resultsHeaderRef,
+    summary,
+    overview,
+    researchGuide,
+    loadingSummary,
+    loadingOverview,
+    loadingResearchGuide,
+    activeTab: controlledActiveTab,
     onNavigateHistory,
     onOptionClick,
     onActionSelect,
     onKeyDown,
     onBackToBreakdown,
     onContentAction,
-    onMoreClick
+    onMoreClick,
+    onTabChange
 }) => {
-    const getContentTitle = () => {
-        if (!currentContent) return '';
+    const [activeTab, setActiveTab] = useState(controlledActiveTab || 0);
 
-        switch (currentContent.action) {
-            case 'overview':
-                return `Overview of "${currentContent.concept}"`;
-            case 'research_guide':
-                return `Research Guide for "${currentContent.concept}"`;
-            default:
-                return currentContent.concept;
+    // Sync with controlled active tab
+    useEffect(() => {
+        if (controlledActiveTab !== undefined) {
+            setActiveTab(controlledActiveTab);
         }
+    }, [controlledActiveTab]);
+
+    const handleTabChange = (event, newValue) => {
+        setActiveTab(newValue);
+        // Notify parent about tab change
+        const actions = ['overview', 'breakdown', 'research_guide'];
+        onTabChange(actions[newValue], newValue);
     };
 
-    const getContentDescription = () => {
-        if (!currentContent) return '';
-
-        switch (currentContent.action) {
-            case 'overview':
-                return 'Key concepts and principles:';
-            case 'research_guide':
-                return 'Your comprehensive study roadmap:';
-            default:
-                return '';
+    const getCurrentConcept = () => {
+        if (currentBreakdown) {
+            return currentBreakdown.concept;
         }
+        if (currentContent) {
+            return currentContent.concept;
+        }
+        return '';
+    };
+
+    const normalizeTitle = (concept) => {
+        // Simple title normalization - capitalize each word
+        return concept
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
     };
 
     return (
@@ -59,7 +77,7 @@ export const ResultsSection = ({
                 onNavigate={onNavigateHistory}
             />
 
-            {/* Results Header and Content */}
+            {/* Main Content Card */}
             <Paper
                 elevation={0}
                 sx={{
@@ -79,11 +97,11 @@ export const ResultsSection = ({
                     }
                 }}
             >
-                {/* Header with Back Button for Content Views */}
+                {/* Header with Title and Summary */}
                 <Box sx={{
                     background: '#1a1a2e',
                     color: '#fafafa',
-                    p: 3,
+                    p: 4,
                     position: 'relative',
                     overflow: 'hidden',
                     '&::before': {
@@ -98,68 +116,151 @@ export const ResultsSection = ({
                     }
                 }}>
                     <Box sx={{ position: 'relative', zIndex: 2 }}>
-                        {/* Back Button for Content Views */}
-                        {contentType === 'overview' && (
-                            <Button
-                                onClick={onBackToBreakdown}
-                                startIcon={<ArrowLeft size={16} />}
-                                sx={{
-                                    color: '#fafafa',
-                                    mb: 2,
-                                    fontWeight: 600,
-                                    textTransform: 'none',
-                                    '&:hover': {
-                                        background: 'rgba(250, 250, 250, 0.1)'
-                                    }
-                                }}
-                            >
-                                Back to Breakdown
-                            </Button>
-                        )}
-
                         <Typography
                             ref={resultsHeaderRef}
-                            variant="h5"
-                            sx={{ fontWeight: 700, mb: 1 }}
+                            variant="h4"
+                            sx={{ fontWeight: 800, mb: 2 }}
                         >
-                            {contentType === 'breakdown' && currentBreakdown
-                                ? `Exploring "${currentBreakdown.concept}"`
-                                : getContentTitle()
-                            }
+                            {normalizeTitle(getCurrentConcept())}
                         </Typography>
-                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                            {contentType === 'breakdown'
-                                ? 'Here are the key areas and components:'
-                                : getContentDescription()
-                            }
-                        </Typography>
+
+                        {/* Summary Section */}
+                        {loadingSummary ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <CircularProgress size={16} sx={{ color: '#fafafa' }} />
+                                <Typography variant="body1" sx={{ opacity: 0.8, fontStyle: 'italic' }}>
+                                    Generating summary...
+                                </Typography>
+                            </Box>
+                        ) : summary ? (
+                            <Typography variant="body1" sx={{ opacity: 0.9, lineHeight: 1.8, maxWidth: '800px' }}>
+                                {summary}
+                            </Typography>
+                        ) : null}
                     </Box>
                 </Box>
 
-                <Box sx={{ p: 4 }}>
-                    {/* Breakdown Content */}
-                    {contentType === 'breakdown' && currentBreakdown && (
-                        <BreakdownList
-                            breakdown={currentBreakdown.breakdown}
-                            selectedIndex={selectedIndex}
-                            expandedIndex={expandedIndex}
-                            onOptionClick={onOptionClick}
-                            onActionSelect={onActionSelect}
-                            onKeyDown={onKeyDown}
-                            onMoreClick={onMoreClick}
-                            importanceData={importanceData}
-                            priorityData={priorityData}
-                            loadingMore={loadingMore}
+                {/* Tabs Navigation */}
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#f8f9fa' }}>
+                    <Tabs
+                        value={activeTab}
+                        onChange={handleTabChange}
+                        sx={{
+                            '& .MuiTabs-indicator': {
+                                height: 4,
+                                background: 'linear-gradient(90deg, #0066ff, #00b894)'
+                            },
+                            '& .MuiTab-root': {
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                fontSize: '1rem',
+                                minHeight: 64,
+                                px: 3,
+                                color: '#4a4a6a',
+                                '&.Mui-selected': {
+                                    color: '#1a1a2e'
+                                },
+                                '&:hover': {
+                                    color: '#1a1a2e',
+                                    bgcolor: 'rgba(26, 26, 46, 0.04)'
+                                }
+                            }
+                        }}
+                    >
+                        <Tab
+                            icon={<Info size={20} />}
+                            iconPosition="start"
+                            label="Summary"
+                            id="concept-tab-0"
+                            aria-controls="concept-tabpanel-0"
                         />
-                    )}
+                        <Tab
+                            icon={<TrendingUp size={20} />}
+                            iconPosition="start"
+                            label="Breakdown"
+                            id="concept-tab-1"
+                            aria-controls="concept-tabpanel-1"
+                        />
+                        <Tab
+                            icon={<BookOpen size={20} />}
+                            iconPosition="start"
+                            label="Research Guide"
+                            id="concept-tab-2"
+                            aria-controls="concept-tabpanel-2"
+                        />
+                    </Tabs>
+                </Box>
 
-                    {/* Content Display (Overview) */}
-                    {currentContent && (
-                        <ContentDisplay
-                            content={currentContent}
-                            onActionSelect={onContentAction}
-                        />
-                    )}
+                {/* Tab Panels */}
+                <Box sx={{ p: 4 }}>
+                    {/* Summary Tab */}
+                    <TabPanel value={activeTab} index={0}>
+                        {loadingOverview ? (
+                            <Box sx={{ textAlign: 'center', py: 8 }}>
+                                <CircularProgress sx={{ color: '#1a1a2e', mb: 2 }} />
+                                <Typography variant="body1" sx={{ color: '#4a4a6a' }}>
+                                    Loading overview...
+                                </Typography>
+                            </Box>
+                        ) : overview ? (
+                            <ContentDisplay
+                                content={{ content: overview, action: 'overview', concept: getCurrentConcept() }}
+                                onActionSelect={onContentAction}
+                                hideActions={true}
+                            />
+                        ) : (
+                            <Typography variant="body1" sx={{ color: '#4a4a6a', fontStyle: 'italic', textAlign: 'center', py: 8 }}>
+                                Click to load the overview for this concept.
+                            </Typography>
+                        )}
+                    </TabPanel>
+
+                    {/* Breakdown Tab */}
+                    <TabPanel value={activeTab} index={1}>
+                        {currentBreakdown ? (
+                            <BreakdownList
+                                breakdown={currentBreakdown.breakdown}
+                                selectedIndex={selectedIndex}
+                                expandedIndex={expandedIndex}
+                                onOptionClick={onOptionClick}
+                                onActionSelect={onActionSelect}
+                                onKeyDown={onKeyDown}
+                                onMoreClick={onMoreClick}
+                                importanceData={importanceData}
+                                priorityData={priorityData}
+                                loadingMore={loadingMore}
+                            />
+                        ) : (
+                            <Box sx={{ textAlign: 'center', py: 8 }}>
+                                <CircularProgress sx={{ color: '#1a1a2e', mb: 2 }} />
+                                <Typography variant="body1" sx={{ color: '#4a4a6a' }}>
+                                    Loading breakdown...
+                                </Typography>
+                            </Box>
+                        )}
+                    </TabPanel>
+
+                    {/* Research Guide Tab */}
+                    <TabPanel value={activeTab} index={2}>
+                        {loadingResearchGuide ? (
+                            <Box sx={{ textAlign: 'center', py: 8 }}>
+                                <CircularProgress sx={{ color: '#1a1a2e', mb: 2 }} />
+                                <Typography variant="body1" sx={{ color: '#4a4a6a' }}>
+                                    Loading research guide...
+                                </Typography>
+                            </Box>
+                        ) : researchGuide ? (
+                            <ContentDisplay
+                                content={{ content: researchGuide, action: 'research_guide', concept: getCurrentConcept() }}
+                                onActionSelect={onContentAction}
+                                hideActions={true}
+                            />
+                        ) : (
+                            <Typography variant="body1" sx={{ color: '#4a4a6a', fontStyle: 'italic', textAlign: 'center', py: 8 }}>
+                                Click to load the research guide for this concept.
+                            </Typography>
+                        )}
+                    </TabPanel>
                 </Box>
             </Paper>
         </Box>

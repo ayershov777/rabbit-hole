@@ -91,6 +91,33 @@ Rules:
 Format: Return a well-organized explanation (2-3 paragraphs, about 150-200 words) that gives a thorough but concise overview of what the concept encompasses.`;
     }
 
+    createSummarySystemPrompt() {
+        return `You are an expert educational assistant that provides concise, layman-friendly summaries of concepts. Your goal is to explain what a concept is in simple terms that anyone can understand.
+
+Rules:
+1. Keep summaries extremely brief - 1-2 sentences maximum (40-60 words)
+2. Use simple, everyday language - avoid jargon
+3. Focus on the essence of what the concept is and why it matters
+4. Make it engaging and accessible to someone with no background knowledge
+5. If the concept is part of a learning path, briefly mention that context
+6. Avoid technical details - save those for the overview
+
+Format: Return a single paragraph summary that captures the essence of the concept in layman's terms.`;
+    }
+
+    createResearchGuideSystemPrompt() {
+        return `You are an expert educational assistant that creates friendly research guides for learners.
+
+Rules:
+1. Keep it brief so the user can read it at a glance
+2. Focus on practical, actionable steps
+3. Suggest specific types of resources to look for (books, courses, articles, videos)
+4. Give a optimistic time estimate using: minutes, hours, days, or weeks (don't specify a number)
+5. Consider the learning path context to provide targeted guidance
+
+Format: Return a comprehensive research guide organized with clear headings and actionable steps that learners can follow to master the concept systematically.`;
+    }
+
     async generateBreakdownWithPriorities(concept, learningPath = [], userId = null) {
         try {
             // First, get the breakdown
@@ -191,56 +218,6 @@ Return a JSON object with priority levels (1-4) and brief reasons.`;
         }
     }
 
-    parsePriorityResponse(text, concepts) {
-        try {
-            // Clean the response to ensure it's valid JSON
-            let cleanedText = text.trim();
-            cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-
-            // Extract JSON object
-            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                cleanedText = jsonMatch[0];
-            }
-
-            const priorityData = JSON.parse(cleanedText);
-
-            // Normalize the response to match our concepts
-            const normalizedPriorities = {};
-            concepts.forEach(concept => {
-                // Try to find a matching key in the response
-                const matchingKey = Object.keys(priorityData).find(key =>
-                    key.toLowerCase().includes(concept.toLowerCase()) ||
-                    concept.toLowerCase().includes(key.toLowerCase())
-                );
-
-                if (matchingKey && priorityData[matchingKey]) {
-                    normalizedPriorities[concept] = {
-                        level: priorityData[matchingKey].level || 2,
-                        reason: priorityData[matchingKey].reason || "Important for understanding"
-                    };
-                } else {
-                    // Default if not found
-                    normalizedPriorities[concept] = {
-                        level: 2,
-                        reason: "Important for understanding"
-                    };
-                }
-            });
-
-            return normalizedPriorities;
-
-        } catch (error) {
-            console.error('Error parsing priority response:', error);
-            // Return default priorities
-            const defaultPriorities = {};
-            concepts.forEach(concept => {
-                defaultPriorities[concept] = { level: 2, reason: "Priority evaluation unavailable" };
-            });
-            return defaultPriorities;
-        }
-    }
-
     async generateBreakdown(concept, learningPath = [], userId = null) {
         try {
             const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
@@ -323,19 +300,6 @@ Remember: This is completely independent of any previous requests.`;
         }
     }
 
-    createResearchGuideSystemPrompt() {
-        return `You are an expert educational assistant that creates friendly research guides for learners.
-
-Rules:
-1. Keep it brief so the user can read it at a glance
-2. Focus on practical, actionable steps
-3. Suggest specific types of resources to look for (books, courses, articles, videos)
-4. Give a optimistic time estimate using: minutes, hours, days, or weeks (don't specify a number)
-5. Consider the learning path context to provide targeted guidance
-
-Format: Return a comprehensive research guide organized with clear headings and actionable steps that learners can follow to master the concept systematically.`;
-    }
-
     async generateContent(concept, action, learningPath = [], userId = null) {
         try {
             const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
@@ -360,6 +324,9 @@ Format: Return a comprehensive research guide organized with clear headings and 
                 let systemPrompt;
 
                 switch (action) {
+                    case 'summary':
+                        systemPrompt = this.createSummarySystemPrompt();
+                        break;
                     case 'importance':
                         systemPrompt = this.createImportanceSystemPrompt();
                         break;
@@ -378,7 +345,13 @@ Format: Return a comprehensive research guide organized with clear headings and 
                         },
                         {
                             role: 'model',
-                            parts: [{ text: `I understand. I will provide ${action === 'importance' ? 'extremely concise explanations (1-2 sentences, 30-50 words) of why sub-concepts are important components' : action === 'research_guide' ? 'comprehensive research guides (400-500 words) with structured learning paths, resources, and actionable steps' : 'comprehensive but concise overviews of concepts (2-3 short paragraphs, 150-200 words)'}, considering the learning context.` }]
+                            parts: [{
+                                text: `I understand. I will provide ${action === 'summary' ? 'extremely concise summaries (1-2 sentences, 40-60 words) in simple layman terms' :
+                                    action === 'importance' ? 'extremely concise explanations (1-2 sentences, 30-50 words) of why sub-concepts are important components' :
+                                        action === 'research_guide' ? 'comprehensive research guides (400-500 words) with structured learning paths, resources, and actionable steps' :
+                                            'comprehensive but concise overviews of concepts (2-3 short paragraphs, 150-200 words)'
+                                    }, considering the learning context.`
+                            }]
                         }
                     ]
                 });
@@ -395,7 +368,20 @@ Format: Return a comprehensive research guide organized with clear headings and 
 
             // Create contextual prompt
             let prompt;
-            if (action === 'importance') {
+            if (action === 'summary') {
+                if (learningPath.length > 0) {
+                    const pathString = learningPath.join(' → ');
+                    prompt = `Learning path: ${pathString}
+
+Explain "${concept}" in simple terms for someone with no background knowledge. What is it and why does it matter?
+
+Respond with 1-2 sentences maximum (40-60 words) using everyday language.`;
+                } else {
+                    prompt = `Explain "${concept}" in simple terms for someone with no background knowledge. What is it and why does it matter?
+
+Respond with 1-2 sentences maximum (40-60 words) using everyday language.`;
+                }
+            } else if (action === 'importance') {
                 if (learningPath.length > 0) {
                     const pathString = learningPath.join(' → ');
                     prompt = `Learning path: ${pathString}
@@ -641,81 +627,6 @@ Return ONLY a JSON array of new concepts that expand the breadth.`;
         }
     }
 
-    parseBulkImportanceResponse(text, concepts) {
-        try {
-            // Only clean code block indicators
-            let cleanedText = text.trim();
-            cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-
-            // Extract JSON object
-            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                cleanedText = jsonMatch[0];
-            }
-
-            const importanceData = JSON.parse(cleanedText);
-
-            // Return the data as-is - no manipulation or fallbacks
-            return importanceData;
-
-        } catch (error) {
-            console.error('Error parsing bulk importance response:', error);
-            console.error('Raw response:', text);
-
-            // Return empty object on parse error - let the UI handle missing data gracefully
-            return {};
-        }
-    }
-
-    clearSessions(userId = null, learningPath = []) {
-        // If this is a root level clear (empty learning path), clear ALL sessions for this user
-        if (learningPath.length === 0) {
-            const keysToDelete = [];
-            const userPrefix = `${userId || 'anonymous'}_`;
-
-            for (const key of this.chatSessions.keys()) {
-                if (key.startsWith(userPrefix)) {
-                    keysToDelete.push(key);
-                }
-            }
-
-            keysToDelete.forEach(key => {
-                this.chatSessions.delete(key);
-            });
-
-            return { sessionKey: 'all_user_sessions', clearedSessions: keysToDelete.length };
-        }
-
-        // Otherwise, clear specific session and related ones
-        const sessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ')}`;
-        let clearedSessions = 0;
-
-        // Clear the main breakdown session
-        if (this.chatSessions.has(sessionKey)) {
-            this.chatSessions.delete(sessionKey);
-            clearedSessions++;
-        }
-
-        // Clear any related content sessions for this specific path
-        const keysToDelete = [];
-        for (const key of this.chatSessions.keys()) {
-            if (key.includes(sessionKey)) {
-                keysToDelete.push(key);
-            }
-        }
-
-        keysToDelete.forEach(key => {
-            this.chatSessions.delete(key);
-            clearedSessions++;
-        });
-
-        return { sessionKey, clearedSessions };
-    }
-
-    getSessionCount() {
-        return this.chatSessions.size;
-    }
-
     parseBreakdownResponse(text) {
         // Clean the response to ensure it's valid JSON
         let cleanedText = text.trim();
@@ -767,6 +678,131 @@ Return ONLY a JSON array of new concepts that expand the breadth.`;
         }
 
         return breakdown;
+    }
+
+    parseBulkImportanceResponse(text, concepts) {
+        try {
+            // Only clean code block indicators
+            let cleanedText = text.trim();
+            cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+            // Extract JSON object
+            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                cleanedText = jsonMatch[0];
+            }
+
+            const importanceData = JSON.parse(cleanedText);
+
+            // Return the data as-is - no manipulation or fallbacks
+            return importanceData;
+
+        } catch (error) {
+            console.error('Error parsing bulk importance response:', error);
+            console.error('Raw response:', text);
+
+            // Return empty object on parse error - let the UI handle missing data gracefully
+            return {};
+        }
+    }
+
+    parsePriorityResponse(text, concepts) {
+        try {
+            // Clean the response to ensure it's valid JSON
+            let cleanedText = text.trim();
+            cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+            // Extract JSON object
+            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                cleanedText = jsonMatch[0];
+            }
+
+            const priorityData = JSON.parse(cleanedText);
+
+            // Normalize the response to match our concepts
+            const normalizedPriorities = {};
+            concepts.forEach(concept => {
+                // Try to find a matching key in the response
+                const matchingKey = Object.keys(priorityData).find(key =>
+                    key.toLowerCase().includes(concept.toLowerCase()) ||
+                    concept.toLowerCase().includes(key.toLowerCase())
+                );
+
+                if (matchingKey && priorityData[matchingKey]) {
+                    normalizedPriorities[concept] = {
+                        level: priorityData[matchingKey].level || 2,
+                        reason: priorityData[matchingKey].reason || "Important for understanding"
+                    };
+                } else {
+                    // Default if not found
+                    normalizedPriorities[concept] = {
+                        level: 2,
+                        reason: "Important for understanding"
+                    };
+                }
+            });
+
+            return normalizedPriorities;
+
+        } catch (error) {
+            console.error('Error parsing priority response:', error);
+            // Return default priorities
+            const defaultPriorities = {};
+            concepts.forEach(concept => {
+                defaultPriorities[concept] = { level: 2, reason: "Priority evaluation unavailable" };
+            });
+            return defaultPriorities;
+        }
+    }
+
+    clearSessions(userId = null, learningPath = []) {
+        // If this is a root level clear (empty learning path), clear ALL sessions for this user
+        if (learningPath.length === 0) {
+            const keysToDelete = [];
+            const userPrefix = `${userId || 'anonymous'}_`;
+
+            for (const key of this.chatSessions.keys()) {
+                if (key.startsWith(userPrefix)) {
+                    keysToDelete.push(key);
+                }
+            }
+
+            keysToDelete.forEach(key => {
+                this.chatSessions.delete(key);
+            });
+
+            return { sessionKey: 'all_user_sessions', clearedSessions: keysToDelete.length };
+        }
+
+        // Otherwise, clear specific session and related ones
+        const sessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ')}`;
+        let clearedSessions = 0;
+
+        // Clear the main breakdown session
+        if (this.chatSessions.has(sessionKey)) {
+            this.chatSessions.delete(sessionKey);
+            clearedSessions++;
+        }
+
+        // Clear any related content sessions for this specific path
+        const keysToDelete = [];
+        for (const key of this.chatSessions.keys()) {
+            if (key.includes(sessionKey)) {
+                keysToDelete.push(key);
+            }
+        }
+
+        keysToDelete.forEach(key => {
+            this.chatSessions.delete(key);
+            clearedSessions++;
+        });
+
+        return { sessionKey, clearedSessions };
+    }
+
+    getSessionCount() {
+        return this.chatSessions.size;
     }
 
     cleanContent(content) {

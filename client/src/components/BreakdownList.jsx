@@ -5,7 +5,6 @@ import {
     ListItem,
     Avatar,
     Box,
-    Collapse,
     Grid,
     Button,
     Tooltip,
@@ -13,42 +12,12 @@ import {
     Divider
 } from '@mui/material';
 import {
-    ChevronDown,
-    ChevronUp,
-    FileText,
-    TrendingUp,
-    BookOpen,
     Zap,
     Target,
     Compass,
     Telescope,
     Plus
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-
-const actionButtons = [
-    {
-        id: 'overview',
-        label: 'Get an Overview',
-        icon: <FileText size={18} />,
-        color: '#00b894',
-        variant: 'outlined'
-    },
-    {
-        id: 'breakdown',
-        label: 'Break It Down',
-        icon: <TrendingUp size={18} />,
-        color: '#ff6b35',
-        variant: 'outlined'
-    },
-    {
-        id: 'research_guide',
-        label: 'Research Guide',
-        icon: <BookOpen size={18} />,
-        color: '#6f42c1',
-        variant: 'outlined'
-    }
-];
 
 // Priority level configurations
 const priorityLevels = {
@@ -85,12 +54,9 @@ const priorityLevels = {
 export const BreakdownList = ({
     breakdown,
     selectedIndex,
-    expandedIndex,
     onOptionClick,
-    onActionSelect,
     onKeyDown,
     onMoreClick,
-    importanceData = {},
     priorityData = {},
     loadingMore = false
 }) => {
@@ -112,7 +78,7 @@ export const BreakdownList = ({
     return (
         <>
             <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: '#1a1a2e' }}>
-                Click on a concept or use arrow keys to explore options:
+                Click on a concept to explore it further:
             </Typography>
 
             <List
@@ -145,7 +111,6 @@ export const BreakdownList = ({
                             role="option"
                             data-option-index={index}
                             aria-selected={selectedIndex === index}
-                            aria-expanded={expandedIndex === index}
                             onClick={() => onOptionClick(option, index)}
                             sx={{
                                 display: 'block',
@@ -167,7 +132,7 @@ export const BreakdownList = ({
                                     width: 4,
                                     height: '100%',
                                     background: priorityInfo.color,
-                                    transform: selectedIndex === index || expandedIndex === index ? 'scaleY(1)' : 'scaleY(0)',
+                                    transform: selectedIndex === index ? 'scaleY(1)' : 'scaleY(0)',
                                     transition: 'transform 0.3s ease',
                                     transformOrigin: 'bottom',
                                     zIndex: 1
@@ -181,14 +146,13 @@ export const BreakdownList = ({
                                 }
                             }}
                         >
-                            {/* Main List Item Content */}
                             <Box
                                 sx={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 2,
                                     p: 2,
-                                    background: selectedIndex === index || expandedIndex === index ? '#f5f5f5' : 'transparent',
+                                    background: selectedIndex === index ? '#f5f5f5' : 'transparent',
                                     transition: 'background 0.3s ease'
                                 }}
                             >
@@ -264,133 +228,7 @@ export const BreakdownList = ({
                                         </Typography>
                                     </Box>
                                 </Box>
-
-                                {expandedIndex === index ? (
-                                    <ChevronUp
-                                        size={20}
-                                        color="#4a4a6a"
-                                        style={{
-                                            transition: 'transform 0.3s ease'
-                                        }}
-                                    />
-                                ) : (
-                                    <ChevronDown
-                                        size={20}
-                                        color="#4a4a6a"
-                                        style={{
-                                            transition: 'transform 0.3s ease'
-                                        }}
-                                    />
-                                )}
                             </Box>
-
-                            {/* Expandable Action Panel */}
-                            <Collapse in={expandedIndex === index}>
-                                <Box
-                                    sx={{
-                                        p: 3,
-                                        borderTop: '2px solid #e9ecef',
-                                        background: '#f8f9fa'
-                                    }}
-                                >
-                                    {/* Why It's Important Section */}
-                                    {importanceData[option] && (
-                                        <Box sx={{ mb: 3 }}>
-                                            <Typography
-                                                variant="subtitle2"
-                                                sx={{
-                                                    fontWeight: 700,
-                                                    color: '#0066ff',
-                                                    mb: 1,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 1
-                                                }}
-                                            >
-                                                💡 Why It's Important
-                                            </Typography>
-                                            <Box
-                                                sx={{
-                                                    color: '#1a1a2e',
-                                                    lineHeight: 1.6,
-                                                    fontSize: '0.95rem',
-                                                    fontStyle: 'italic',
-                                                    background: '#fff',
-                                                    p: 2,
-                                                    borderRadius: 1,
-                                                    border: '1px solid #e9ecef',
-                                                    '& strong, & b': {
-                                                        fontWeight: 700,
-                                                        color: '#0066ff'
-                                                    },
-                                                    '& em, & i': {
-                                                        fontStyle: 'italic'
-                                                    },
-                                                    '& code': {
-                                                        background: '#f5f5f5',
-                                                        padding: '2px 4px',
-                                                        borderRadius: '3px',
-                                                        fontSize: '0.9em',
-                                                        fontFamily: 'monospace'
-                                                    }
-                                                }}
-                                            >
-                                                <ReactMarkdown>{importanceData[option]}</ReactMarkdown>
-                                            </Box>
-                                        </Box>
-                                    )}
-
-                                    <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: '#1a1a2e',
-                                            mb: 2,
-                                            textAlign: 'center'
-                                        }}
-                                    >
-                                        What would you like to do?
-                                    </Typography>
-
-                                    <Grid container spacing={2}>
-                                        {actionButtons.map((action) => (
-                                            <Grid item xs={12} sm={6} key={action.id}>
-                                                <Button
-                                                    fullWidth
-                                                    variant={action.variant}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onActionSelect(option, action.id);
-                                                    }}
-                                                    startIcon={action.icon}
-                                                    sx={{
-                                                        height: '60px',
-                                                        border: action.variant === 'outlined' ? `2px solid ${action.color}` : 'none',
-                                                        background: action.variant === 'contained' ? action.color : 'transparent',
-                                                        color: action.variant === 'contained' ? '#fafafa' : action.color,
-                                                        fontWeight: 600,
-                                                        textTransform: 'none',
-                                                        borderRadius: 2,
-                                                        transition: 'all 0.3s ease',
-                                                        '&:hover': {
-                                                            background: action.color,
-                                                            color: '#fafafa',
-                                                            transform: 'translateY(-2px)',
-                                                            boxShadow: `0 4px 12px ${action.color}33`
-                                                        },
-                                                        '& .MuiButton-startIcon': {
-                                                            marginRight: 1,
-                                                            color: 'inherit'
-                                                        }
-                                                    }}
-                                                >
-                                                    {action.label}
-                                                </Button>
-                                            </Grid>
-                                        ))}
-                                    </Grid>
-                                </Box>
-                            </Collapse>
                         </ListItem>
                     );
                 })}

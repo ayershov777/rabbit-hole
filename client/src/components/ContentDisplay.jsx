@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Typography, Divider, Grid, Button } from '@mui/material';
 import { FileText, TrendingUp, BookOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -27,7 +26,7 @@ const actionButtons = [
     }
 ];
 
-export const ContentDisplay = ({ content, onActionSelect }) => {
+export const ContentDisplay = ({ content, onActionSelect, hideActions = false }) => {
     return (
         <Box sx={{ mt: 2 }}>
             <Box
@@ -320,58 +319,60 @@ export const ContentDisplay = ({ content, onActionSelect }) => {
             </Box>
 
             {/* Action Buttons for Content Views */}
-            <Divider sx={{ my: 4 }} />
+            {!hideActions && <>
+                <Divider sx={{ my: 4 }} />
 
-            <Box sx={{ mt: 4 }}>
-                <Typography
-                    variant="h6"
-                    sx={{
-                        fontWeight: 700,
-                        color: '#1a1a2e',
-                        mb: 3,
-                        textAlign: 'center'
-                    }}
-                >
-                    What would you like to do next?
-                </Typography>
+                <Box sx={{ mt: 4 }}>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            fontWeight: 700,
+                            color: '#1a1a2e',
+                            mb: 3,
+                            textAlign: 'center'
+                        }}
+                    >
+                        What would you like to do next?
+                    </Typography>
 
-                <Grid container spacing={2}>
-                    {actionButtons
-                        .filter(action => action.id !== content.action)
-                        .map((action) => (
-                            <Grid item xs={12} sm={6} key={action.id}>
-                                <Button
-                                    fullWidth
-                                    variant={action.variant}
-                                    onClick={() => onActionSelect(content.concept, action.id)}
-                                    startIcon={action.icon}
-                                    sx={{
-                                        height: '60px',
-                                        border: action.variant === 'outlined' ? `2px solid ${action.color}` : 'none',
-                                        background: action.variant === 'contained' ? action.color : 'transparent',
-                                        color: action.variant === 'contained' ? '#fafafa' : action.color,
-                                        fontWeight: 600,
-                                        textTransform: 'none',
-                                        borderRadius: 2,
-                                        transition: 'all 0.3s ease',
-                                        '&:hover': {
-                                            background: action.color,
-                                            color: '#fafafa',
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: `0 4px 12px ${action.color}33`
-                                        },
-                                        '& .MuiButton-startIcon': {
-                                            marginRight: 1,
-                                            color: 'inherit'
-                                        }
-                                    }}
-                                >
-                                    {action.label}
-                                </Button>
-                            </Grid>
-                        ))}
-                </Grid>
-            </Box>
+                    <Grid container spacing={2}>
+                        {actionButtons
+                            .filter(action => action.id !== content.action)
+                            .map((action) => (
+                                <Grid item xs={12} sm={6} key={action.id}>
+                                    <Button
+                                        fullWidth
+                                        variant={action.variant}
+                                        onClick={() => onActionSelect(content.concept, action.id)}
+                                        startIcon={action.icon}
+                                        sx={{
+                                            height: '60px',
+                                            border: action.variant === 'outlined' ? `2px solid ${action.color}` : 'none',
+                                            background: action.variant === 'contained' ? action.color : 'transparent',
+                                            color: action.variant === 'contained' ? '#fafafa' : action.color,
+                                            fontWeight: 600,
+                                            textTransform: 'none',
+                                            borderRadius: 2,
+                                            transition: 'all 0.3s ease',
+                                            '&:hover': {
+                                                background: action.color,
+                                                color: '#fafafa',
+                                                transform: 'translateY(-2px)',
+                                                boxShadow: `0 4px 12px ${action.color}33`
+                                            },
+                                            '& .MuiButton-startIcon': {
+                                                marginRight: 1,
+                                                color: 'inherit'
+                                            }
+                                        }}
+                                    >
+                                        {action.label}
+                                    </Button>
+                                </Grid>
+                            ))}
+                    </Grid>
+                </Box>
+            </>}
         </Box>
     );
 };
