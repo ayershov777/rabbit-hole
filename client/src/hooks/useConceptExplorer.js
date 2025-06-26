@@ -506,17 +506,8 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
                 setLoadingMore(false);
                 clearInterval(progressInterval);
 
-                // Scroll to the first new concept
-                setTimeout(() => {
-                    const firstNewIndex = currentBreakdown.breakdown.length;
-                    const newElement = document.querySelector(`[data-option-index="${firstNewIndex}"]`);
-                    if (newElement) {
-                        newElement.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'center'
-                        });
-                    }
-                }, 100);
+                // Removed the autoscroll logic here
+                // No automatic scrolling to new concepts
 
             }, 500);
 
