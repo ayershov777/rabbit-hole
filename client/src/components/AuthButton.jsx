@@ -11,12 +11,14 @@ import {
 } from '@mui/material';
 import { User, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useScrollVisibility } from '../hooks/useScrollVisibility';
 import AuthModal from './AuthModal';
 
 export const AuthButton = () => {
     const { user, isAuthenticated, logout, loading } = useAuth();
     const [anchorEl, setAnchorEl] = useState(null);
     const [authModalOpen, setAuthModalOpen] = useState(false);
+    const isVisible = useScrollVisibility(10);
     const open = Boolean(anchorEl);
 
     const handleClick = (event) => {
@@ -55,7 +57,11 @@ export const AuthButton = () => {
                     position: 'fixed',
                     top: 20,
                     right: 20,
-                    zIndex: 1000
+                    zIndex: 1000,
+                    opacity: isVisible ? 1 : 0,
+                    transform: isVisible ? 'translateY(0)' : 'translateY(-100%)',
+                    transition: 'opacity 0.3s ease, transform 0.3s ease',
+                    pointerEvents: isVisible ? 'auto' : 'none'
                 }}
             />
         );
@@ -68,7 +74,11 @@ export const AuthButton = () => {
                     position: 'fixed',
                     top: 20,
                     right: 20,
-                    zIndex: 1000
+                    zIndex: 1000,
+                    opacity: isVisible ? 1 : 0,
+                    transform: isVisible ? 'translateY(0)' : 'translateY(-100%)',
+                    transition: 'opacity 0.3s ease, transform 0.3s ease',
+                    pointerEvents: isVisible ? 'auto' : 'none'
                 }}
             >
                 {isAuthenticated ? (
