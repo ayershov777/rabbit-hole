@@ -197,7 +197,12 @@ export const ChatInterface = ({
     };
 
     return (
-        <Box sx={{ height: '600px', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{
+            height: { xs: '600px', md: '700px' },
+            display: 'flex',
+            flexDirection: 'column',
+            maxWidth: '100%'
+        }}>
             {/* Chat Header */}
             <Box sx={{
                 display: 'flex',
@@ -248,7 +253,8 @@ export const ChatInterface = ({
                                     width: 32,
                                     height: 32,
                                     bgcolor: message.role === 'user' ? '#0066ff' : '#00b894',
-                                    fontSize: '0.75rem'
+                                    fontSize: '0.75rem',
+                                    flexShrink: 0
                                 }}
                             >
                                 {message.role === 'user' ? <User size={16} /> : <Bot size={16} />}
@@ -262,13 +268,66 @@ export const ChatInterface = ({
                                     border: '2px solid',
                                     borderColor: message.role === 'user' ? '#0066ff' : '#e9ecef',
                                     borderRadius: 2,
-                                    maxWidth: '80%',
-                                    '& p': { margin: 0 },
-                                    '& p:not(:last-child)': { marginBottom: 1 }
+                                    maxWidth: { xs: '85%', md: '75%' },
+                                    // Enhanced markdown styles for chat bubbles
+                                    '& p': {
+                                        margin: 0,
+                                        marginBottom: '0.75rem',
+                                        '&:last-child': { marginBottom: 0 }
+                                    },
+                                    '& ul, & ol': {
+                                        margin: '0.5rem 0',
+                                        paddingLeft: '1.5rem',
+                                        '&:first-of-type': { marginTop: 0 },
+                                        '&:last-child': { marginBottom: 0 }
+                                    },
+                                    '& li': {
+                                        marginBottom: '0.5rem',
+                                        lineHeight: 1.6,
+                                        '&:last-child': { marginBottom: 0 }
+                                    },
+                                    '& li ul, & li ol': {
+                                        marginTop: '0.5rem',
+                                        marginBottom: '0.5rem'
+                                    },
+                                    '& pre': {
+                                        margin: '0.75rem 0',
+                                        padding: '0.75rem',
+                                        background: message.role === 'user' ? 'rgba(255, 255, 255, 0.1)' : '#f8f9fa',
+                                        borderRadius: '4px',
+                                        overflow: 'auto',
+                                        '&:first-of-type': { marginTop: 0 },
+                                        '&:last-child': { marginBottom: 0 }
+                                    },
+                                    '& code': {
+                                        padding: '0.125rem 0.375rem',
+                                        background: message.role === 'user' ? 'rgba(255, 255, 255, 0.2)' : '#f8f9fa',
+                                        borderRadius: '3px',
+                                        fontSize: '0.875em',
+                                        fontFamily: 'Monaco, Consolas, monospace'
+                                    },
+                                    '& h1, & h2, & h3, & h4, & h5, & h6': {
+                                        marginTop: '1rem',
+                                        marginBottom: '0.5rem',
+                                        '&:first-of-type': { marginTop: 0 }
+                                    },
+                                    '& blockquote': {
+                                        borderLeft: '3px solid',
+                                        borderLeftColor: message.role === 'user' ? 'rgba(255, 255, 255, 0.5)' : '#e9ecef',
+                                        paddingLeft: '1rem',
+                                        marginLeft: 0,
+                                        marginRight: 0,
+                                        fontStyle: 'italic',
+                                        opacity: 0.9
+                                    }
                                 }}
                             >
                                 {message.role === 'assistant' ? (
-                                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                                    <div className="chat-message-content">
+                                        <ReactMarkdown>
+                                            {message.content}
+                                        </ReactMarkdown>
+                                    </div>
                                 ) : (
                                     <Typography variant="body1">{message.content}</Typography>
                                 )}

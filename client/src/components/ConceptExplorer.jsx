@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Container, Alert } from '@mui/material';
+import { Container, Alert, Box } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { MainInput } from './MainInput';
 import { LoadingState } from './LoadingState';
@@ -410,36 +410,47 @@ export const ConceptExplorer = () => {
     }, [currentBreakdown, currentContent, setSelectedIndex, setExpandedIndex, setMenuButtonsReady]);
 
     return (
-        <Container maxWidth="md">
+        <Container
+            maxWidth={false}  // Always use no max width on Container
+            sx={{
+                px: { xs: 2, sm: 3 }
+            }}
+        >
             {/* Main Input */}
-            <MainInput
-                concept={concept}
-                setConcept={setConcept}
-                onSubmit={startBreakdown}
-                loading={loading}
-            />
+            <Box sx={{ maxWidth: { xs: '100%', sm: '900px' }, mx: 'auto', transition: 'all 0.3s ease' }}>
+                <MainInput
+                    concept={concept}
+                    setConcept={setConcept}
+                    onSubmit={startBreakdown}
+                    loading={loading}
+                />
+            </Box>
 
             {/* Error Display */}
             {error && (
-                <Alert
-                    severity="error"
-                    sx={{
-                        mb: 4,
-                        border: '3px solid #d32f2f',
-                        borderRadius: 2,
-                        fontWeight: 600
-                    }}
-                >
-                    {error}
-                </Alert>
+                <Box sx={{ maxWidth: { xs: '100%', sm: '900px' }, mx: 'auto', transition: 'all 0.3s ease' }}>
+                    <Alert
+                        severity="error"
+                        sx={{
+                            mb: 4,
+                            border: '3px solid #d32f2f',
+                            borderRadius: 2,
+                            fontWeight: 600
+                        }}
+                    >
+                        {error}
+                    </Alert>
+                </Box>
             )}
 
             {/* Loading State */}
             {(loading || loadingMore) && (
-                <LoadingState
-                    loadingMessage={loadingMessage}
-                    loadingProgress={loadingProgress}
-                />
+                <Box sx={{ maxWidth: { xs: '100%', sm: '900px' }, mx: 'auto', transition: 'all 0.3s ease' }}>
+                    <LoadingState
+                        loadingMessage={loadingMessage}
+                        loadingProgress={loadingProgress}
+                    />
+                </Box>
             )}
 
             {/* Results Section */}

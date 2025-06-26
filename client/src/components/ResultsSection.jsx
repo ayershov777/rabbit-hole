@@ -26,7 +26,7 @@ export const ResultsSection = ({
     loadingOverview,
     loadingResearchGuide,
     activeTab: controlledActiveTab,
-    currentChatState, // New prop for chat persistence
+    currentChatState,
     onNavigateHistory,
     onOptionClick,
     onActionSelect,
@@ -36,7 +36,7 @@ export const ResultsSection = ({
     onMoreClick,
     onTabChange,
     onStartChat,
-    onChatStateChange // New prop for chat state updates
+    onChatStateChange
 }) => {
     const [activeTab, setActiveTab] = useState(controlledActiveTab || 0);
 
@@ -77,8 +77,20 @@ export const ResultsSection = ({
             .join(' ');
     };
 
+    // Check if current tab should have wider layout
+    const isWideTab = activeTab === 2 || activeTab === 3; // Research Guide or Chat
+
     return (
-        <Box>
+        <Box sx={{
+            width: '100%',
+            maxWidth: {
+                xs: '100%', // Full width on mobile
+                sm: isWideTab ? '95%' : '900px', // Slightly less on tablets
+                md: isWideTab ? '1100px' : '900px' // Full widths on desktop
+            },
+            mx: 'auto',
+            transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
             {/* Breadcrumb History */}
             <BreadcrumbNavigation
                 history={breakdownHistory}
@@ -95,6 +107,7 @@ export const ResultsSection = ({
                     boxShadow: '4px 4px 0px #1a1a2e',
                     overflow: 'hidden',
                     position: 'relative',
+                    width: '100%',
                     '&::before': {
                         content: '""',
                         position: 'absolute',
@@ -207,8 +220,12 @@ export const ResultsSection = ({
                     </Tabs>
                 </Box>
 
-                {/* Tab Panels */}
-                <Box sx={{ p: 4 }}>
+                {/* Tab Panels with conditional padding for wider tabs */}
+                <Box sx={{
+                    p: isWideTab
+                        ? { xs: 2, sm: 3, md: 4, lg: '48px 64px' }
+                        : 4
+                }}>
                     {/* Summary Tab */}
                     <TabPanel value={activeTab} index={0}>
                         {loadingOverview ? (
@@ -280,7 +297,7 @@ export const ResultsSection = ({
                         )}
                     </TabPanel>
 
-                    {/* Chat Tab */}
+                    {/* Chat Tab - now renders with wider layout */}
                     <TabPanel value={activeTab} index={3}>
                         <ChatInterface
                             key={`${getCurrentConcept()}_${breakdownHistory.slice(0, currentHistoryIndex + 1).map(item => item.concept).join('→')}`}
