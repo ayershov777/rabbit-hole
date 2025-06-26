@@ -24,6 +24,7 @@ import {
     Telescope,
     Plus
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 const actionButtons = [
     {
@@ -308,8 +309,7 @@ export const BreakdownList = ({
                                             >
                                                 💡 Why It's Important
                                             </Typography>
-                                            <Typography
-                                                variant="body2"
+                                            <Box
                                                 sx={{
                                                     color: '#1a1a2e',
                                                     lineHeight: 1.6,
@@ -334,10 +334,9 @@ export const BreakdownList = ({
                                                         fontFamily: 'monospace'
                                                     }
                                                 }}
-                                                dangerouslySetInnerHTML={{
-                                                    __html: importanceData[option]
-                                                }}
-                                            />
+                                            >
+                                                <ReactMarkdown>{importanceData[option]}</ReactMarkdown>
+                                            </Box>
                                         </Box>
                                     )}
 

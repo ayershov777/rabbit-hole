@@ -139,6 +139,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
                     concept: conceptText,
                     breakdown: data.breakdown,
                     priorities: data.priorities || {},
+                    importance: {},
                     timestamp: Date.now()
                 };
 
@@ -167,11 +168,16 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
 
                     if (importanceResponse.ok) {
                         const importanceResult = await importanceResponse.json();
-                        const processedImportance = {};
-                        Object.entries(importanceResult.importance).forEach(([key, value]) => {
-                            processedImportance[key] = markdownToHtml(value);
+                        setImportanceData(importanceResult.importance);
+
+                        // Update the current breakdown history item with importance data
+                        setBreakdownHistory(prev => {
+                            const newHistory = [...prev];
+                            if (newHistory[0]) {
+                                newHistory[0] = { ...newHistory[0], importance: importanceResult.importance };
+                            }
+                            return newHistory;
                         });
-                        setImportanceData(processedImportance);
                     }
                 } catch (importanceError) {
                     console.warn('Could not load importance explanations:', importanceError);
@@ -231,6 +237,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
                 setCurrentContent(null);
                 setContentType('breakdown');
                 setPriorityData(cachedContent.priorities || {});
+                setImportanceData(cachedContent.importance || {});
 
                 if (cachedContent.concept !== (breakdownHistory[currentHistoryIndex]?.concept)) {
                     console.log('Cached breakdown differs from current, updating history');
@@ -321,6 +328,7 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
                         concept: conceptText,
                         breakdown: data.breakdown,
                         priorities: data.priorities || {},
+                        importance: {}, // Initialize empty, will be updated later
                         timestamp: Date.now()
                     };
 
@@ -329,6 +337,16 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
                     setContentType('breakdown');
                     setPriorityData(data.priorities || {});
                     contentToCache = newBreakdown;
+
+                    // Update history first
+                    setBreakdownHistory(prev => {
+                        const newHistory = [...prev];
+                        const newIndex = currentHistoryIndex + 1;
+                        newHistory[newIndex] = newBreakdown;
+                        return newHistory.slice(0, newIndex + 1);
+                    });
+
+                    setCurrentHistoryIndex(prev => prev + 1);
 
                     // Generate importance explanations
                     try {
@@ -346,28 +364,28 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
 
                         if (importanceResponse.ok) {
                             const importanceResult = await importanceResponse.json();
-                            const processedImportance = {};
-                            Object.entries(importanceResult.importance).forEach(([key, value]) => {
-                                processedImportance[key] = markdownToHtml(value);
+                            setImportanceData(importanceResult.importance);
+
+                            // Update the history item we just added with importance data
+                            const updatedBreakdown = { ...newBreakdown, importance: importanceResult.importance };
+                            contentToCache = updatedBreakdown;
+
+                            setBreakdownHistory(prev => {
+                                const newHistory = [...prev];
+                                const targetIndex = currentHistoryIndex + 1;
+                                if (newHistory[targetIndex]) {
+                                    newHistory[targetIndex] = updatedBreakdown;
+                                }
+                                return newHistory;
                             });
-                            setImportanceData(processedImportance);
                         }
                     } catch (importanceError) {
                         console.warn('Could not load importance explanations:', importanceError);
                     }
-
-                    setBreakdownHistory(prev => {
-                        const newHistory = [...prev];
-                        const newIndex = currentHistoryIndex + 1;
-                        newHistory[newIndex] = newBreakdown;
-                        return newHistory.slice(0, newIndex + 1);
-                    });
-
-                    setCurrentHistoryIndex(prev => prev + 1);
                 } else {
                     const newContent = {
                         concept: conceptText,
-                        content: data.content, // ← Keep raw markdown
+                        content: data.content,
                         action: action,
                         timestamp: Date.now()
                     };
@@ -549,16 +567,19 @@ export const useConceptExplorer = (getAuthHeaders, resultsHeaderRef) => {
         setSelectedIndex(-1);
         setExpandedIndex(-1);
         setPriorityData(historyItem.priorities || {});
+        setImportanceData(historyItem.importance || {}); // Restore importance data
     }, [breakdownHistory]);
 
     const goBackToBreakdown = useCallback(() => {
         if (currentHistoryIndex >= 0 && breakdownHistory[currentHistoryIndex]) {
-            setCurrentBreakdown(breakdownHistory[currentHistoryIndex]);
+            const historyItem = breakdownHistory[currentHistoryIndex];
+            setCurrentBreakdown(historyItem);
             setCurrentContent(null);
             setContentType('breakdown');
             setSelectedIndex(-1);
             setExpandedIndex(-1);
-            setPriorityData(breakdownHistory[currentHistoryIndex].priorities || {});
+            setPriorityData(historyItem.priorities || {});
+            setImportanceData(historyItem.importance || {}); // Restore importance data
         }
     }, [currentHistoryIndex, breakdownHistory]);
 

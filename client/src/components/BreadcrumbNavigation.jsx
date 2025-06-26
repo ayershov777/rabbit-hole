@@ -27,35 +27,37 @@ export const BreadcrumbNavigation = ({ history, currentIndex, onNavigate }) => {
             </Box>
             <Breadcrumbs separator="›" sx={{ flexWrap: 'wrap' }}>
                 {getVisibleHistory().map((item, index) => (
-                    <Chip
-                        key={index}
-                        label={item.concept.length > 30 ? item.concept.substring(0, 30) + '...' : item.concept}
-                        onClick={() => onNavigate(index)}
-                        variant={index === currentIndex ? 'filled' : 'outlined'}
-                        sx={{
-                            margin: '2px 0',
-                            fontWeight: 600,
-                            border: '3px solid #1a1a2e',
-                            borderRadius: 2,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            ...(index === currentIndex ? {
-                                background: '#1a1a2e',
-                                color: '#fafafa',
-                                '&:hover': {
-                                    background: '#1a1a2e'
-                                }
-                            } : {
-                                background: '#fafafa',
-                                color: '#1a1a2e',
-                                '&:hover': {
-                                    background: '#f5f5f5',
-                                    transform: 'translateY(-2px)',
-                                    boxShadow: '0 4px 12px rgba(26, 26, 46, 0.15)'
-                                }
-                            })
-                        }}
-                    />
+                    item && item.concept ? (
+                        <Chip
+                            key={index}
+                            label={item.concept.length > 30 ? item.concept.substring(0, 30) + '...' : item.concept}
+                            onClick={() => onNavigate(index)}
+                            variant={index === currentIndex ? 'filled' : 'outlined'}
+                            sx={{
+                                margin: '2px 0',
+                                fontWeight: 600,
+                                border: '3px solid #1a1a2e',
+                                borderRadius: 2,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                ...(index === currentIndex ? {
+                                    background: '#1a1a2e',
+                                    color: '#fafafa',
+                                    '&:hover': {
+                                        background: '#1a1a2e'
+                                    }
+                                } : {
+                                    background: '#fafafa',
+                                    color: '#1a1a2e',
+                                    '&:hover': {
+                                        background: '#f5f5f5',
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: '0 4px 12px rgba(26, 26, 46, 0.15)'
+                                    }
+                                })
+                            }}
+                        />
+                    ) : null
                 ))}
             </Breadcrumbs>
         </Paper>

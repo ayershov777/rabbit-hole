@@ -70,7 +70,8 @@ Rules:
 7. Avoid fluff or unnecessary words
 8. Highlight what makes this sub-concept essential
 
-Format: Return 1-2 concise sentences (30-50 words maximum) explaining why this sub-concept is important within the broader topic.`;
+Format: Return ONLY a JSON object mapping each concept to its importance explanation.
+Example: {"concept1": "importance text", "concept2": "importance text"}`;
     }
 
     createOverviewSystemPrompt() {
@@ -329,7 +330,7 @@ Rules:
 1. Keep it brief so the user can read it at a glance
 2. Focus on practical, actionable steps
 3. Suggest specific types of resources to look for (books, courses, articles, videos)
-4. Give a realistic time estimate using: minutes, hours, days, or weeks (don't specify a number)
+4. Give a optimistic time estimate using: minutes, hours, days, or weeks (don't specify a number)
 5. Consider the learning path context to provide targeted guidance
 
 Format: Return a comprehensive research guide organized with clear headings and actionable steps that learners can follow to master the concept systematically.`;
@@ -512,18 +513,12 @@ Please provide a comprehensive overview of "${concept}" and what it encompasses.
 For each of these sub-concepts/components, explain why it's important within ${learningPath[learningPath.length - 1]} (1-2 sentences, 30-50 words each):
 ${concepts.map((concept, i) => `${i + 1}. ${concept}`).join('\n')}
 
-Focus on each component's role and contribution. Format as:
-1. [concept]: [importance]
-2. [concept]: [importance]
-etc.`;
+Return a JSON object mapping each concept name exactly as provided to its importance explanation.`;
             } else {
                 prompt = `For each of these concepts/areas, explain why it's important (1-2 sentences, 30-50 words each):
 ${concepts.map((concept, i) => `${i + 1}. ${concept}`).join('\n')}
 
-Format as:
-1. [concept]: [importance]
-2. [concept]: [importance]
-etc.`;
+Return a JSON object mapping each concept name exactly as provided to its importance explanation.`;
             }
 
             const result = await chatSession.sendMessage(prompt);
@@ -647,43 +642,29 @@ Return ONLY a JSON array of new concepts that expand the breadth.`;
     }
 
     parseBulkImportanceResponse(text, concepts) {
-        const importanceMap = {};
-        const lines = text.split('\n').filter(line => line.trim());
+        try {
+            // Only clean code block indicators
+            let cleanedText = text.trim();
+            cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
 
-        // Try to match numbered format first
-        lines.forEach(line => {
-            const match = line.match(/^\d+\.\s*(.+?):\s*(.+)$/);
-            if (match) {
-                const [, concept, importance] = match;
-                const cleanConcept = concept.trim();
-                const cleanImportance = importance.trim();
-
-                // Find the closest matching concept from our original list
-                const matchingConcept = concepts.find(c =>
-                    c.toLowerCase().includes(cleanConcept.toLowerCase()) ||
-                    cleanConcept.toLowerCase().includes(c.toLowerCase())
-                );
-
-                if (matchingConcept) {
-                    importanceMap[matchingConcept] = cleanImportance;
-                }
+            // Extract JSON object
+            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                cleanedText = jsonMatch[0];
             }
-        });
 
-        // Fallback: try to extract any concept-importance pairs
-        if (Object.keys(importanceMap).length === 0) {
-            concepts.forEach(concept => {
-                // Escape special regex characters and create pattern
-                const escapedConcept = concept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp(`${escapedConcept}:?\\s*(.+?)(?=\\n|$)`, 'i');
-                const match = text.match(regex);
-                if (match) {
-                    importanceMap[concept] = match[1].trim();
-                }
-            });
+            const importanceData = JSON.parse(cleanedText);
+
+            // Return the data as-is - no manipulation or fallbacks
+            return importanceData;
+
+        } catch (error) {
+            console.error('Error parsing bulk importance response:', error);
+            console.error('Raw response:', text);
+
+            // Return empty object on parse error - let the UI handle missing data gracefully
+            return {};
         }
-
-        return importanceMap;
     }
 
     clearSessions(userId = null, learningPath = []) {
