@@ -35,108 +35,282 @@ export const ContentDisplay = ({ content, onActionSelect }) => {
                     // Typography
                     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
                     color: '#1a1a2e',
-                    lineHeight: 1.7,
-                    fontSize: '1rem',
+                    lineHeight: 1.8,
+                    fontSize: '1.125rem', // Increased from 1.05rem
 
                     // Headings
                     '& h1': {
-                        fontSize: '1.75rem',
-                        fontWeight: 700,
-                        color: '#0066ff',
-                        marginTop: '2rem',
-                        marginBottom: '1rem',
-                        lineHeight: 1.3
+                        fontSize: '2.125rem',
+                        fontWeight: 800,
+                        color: '#1a1a2e',
+                        marginTop: '2.5rem',
+                        marginBottom: '1.25rem',
+                        lineHeight: 1.4,
+                        borderBottom: '3px solid #e9ecef',
+                        paddingBottom: '0.75rem',
+                        '&:first-child': {
+                            marginTop: 0
+                        }
                     },
                     '& h2': {
-                        fontSize: '1.5rem',
+                        fontSize: '1.75rem',
                         fontWeight: 700,
-                        color: '#0066ff',
-                        marginTop: '2rem',
+                        color: '#1a1a2e',
+                        marginTop: '2.25rem',
                         marginBottom: '1rem',
-                        lineHeight: 1.3
+                        lineHeight: 1.4,
+                        borderBottom: '2px solid #f5f5f5',
+                        paddingBottom: '0.5rem',
+                        '&:first-child': {
+                            marginTop: 0
+                        }
                     },
                     '& h3': {
+                        fontSize: '1.5rem',
+                        fontWeight: 700,
+                        color: '#1a1a2e', // Changed from blue
+                        marginTop: '2rem',
+                        marginBottom: '0.875rem',
+                        lineHeight: 1.4,
+                        // Removed gradient accent
+                        '&:first-child': {
+                            marginTop: 0
+                        }
+                    },
+                    '& h4': {
                         fontSize: '1.25rem',
                         fontWeight: 600,
-                        color: '#0066ff',
+                        color: '#4a4a6a',
                         marginTop: '1.5rem',
                         marginBottom: '0.75rem',
-                        lineHeight: 1.3
+                        lineHeight: 1.4,
+                        '&:first-child': {
+                            marginTop: 0
+                        }
                     },
 
                     // Paragraphs
                     '& p': {
-                        marginBottom: '1rem',
-                        lineHeight: 1.7
+                        marginBottom: '1.25rem',
+                        lineHeight: 1.8,
+                        color: '#2d2d3a',
+                        '&:last-child': {
+                            marginBottom: 0
+                        }
                     },
 
                     // Emphasis
-                    '& strong': {
+                    '& strong, & b': {
                         fontWeight: 700,
-                        color: '#0066ff'
+                        color: '#1a1a2e',
+                        background: 'linear-gradient(to bottom, transparent 60%, rgba(0, 102, 255, 0.15) 60%)',
+                        padding: '0 2px'
                     },
-                    '& em': {
+                    '& em, & i': {
                         fontStyle: 'italic',
-                        color: '#4a4a6a'
+                        color: '#4a4a6a',
+                        fontWeight: 500
                     },
 
                     // Code
                     '& code': {
-                        backgroundColor: '#f5f5f5',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
+                        backgroundColor: '#f8f9fa',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
                         fontSize: '0.9em',
                         fontFamily: 'Monaco, Consolas, "Courier New", monospace',
                         border: '1px solid #e9ecef',
-                        color: '#d63384'
+                        color: '#d63384',
+                        fontWeight: 500
                     },
                     '& pre': {
                         backgroundColor: '#f8f9fa',
-                        padding: '1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #e9ecef',
+                        padding: '1.25rem',
+                        borderRadius: '8px',
+                        border: '2px solid #e9ecef',
                         overflow: 'auto',
-                        marginBottom: '1rem'
+                        marginBottom: '1.5rem',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                        position: 'relative',
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '3px',
+                            background: 'linear-gradient(90deg, #0066ff, #00b894, #ff6b35)',
+                            borderRadius: '8px 8px 0 0'
+                        }
                     },
                     '& pre code': {
                         backgroundColor: 'transparent',
                         padding: 0,
                         border: 'none',
-                        color: '#1a1a2e'
+                        color: '#1a1a2e',
+                        fontSize: '0.95em'
                     },
 
-                    // Lists
+                    // Lists - Reduced indentation
                     '& ul, & ol': {
-                        paddingLeft: '1.5rem',
-                        marginBottom: '1rem'
+                        paddingLeft: '1.25rem', // Reduced from 2rem
+                        marginBottom: '1.25rem',
+                        marginTop: '0.5rem',
+                        '&:last-child': {
+                            marginBottom: 0
+                        }
                     },
                     '& li': {
-                        marginBottom: '0.5rem',
-                        lineHeight: 1.6
-                    },
-                    '& ul': {
-                        listStyleType: 'disc'
-                    },
-                    '& ol': {
-                        listStyleType: 'decimal'
+                        marginBottom: '0.625rem',
+                        lineHeight: 1.8,
+                        color: '#2d2d3a',
+                        position: 'relative',
+                        '&:last-child': {
+                            marginBottom: 0
+                        },
+                        '& > p': {
+                            marginBottom: '0.5rem'
+                        },
+                        '& > p:last-child': {
+                            marginBottom: 0
+                        }
                     },
 
-                    // Nested lists
-                    '& ul ul, & ol ol, & ul ol, & ol ul': {
-                        marginTop: '0.5rem',
-                        marginBottom: '0.5rem'
+                    // List styles with neutral bullet color
+                    '& ul': {
+                        listStyleType: 'none',
+                        '& > li': {
+                            paddingLeft: '1.25rem', // Reduced from 1.5rem
+                            '&::before': {
+                                content: '"•"',
+                                position: 'absolute',
+                                left: 0,
+                                color: '#4a4a6a', // Changed from blue to neutral gray
+                                fontWeight: 700,
+                                fontSize: '1.2em',
+                                lineHeight: '1.4'
+                            }
+                        }
+                    },
+                    '& ol': {
+                        listStyleType: 'none',
+                        counterReset: 'ol-counter',
+                        '& > li': {
+                            paddingLeft: '1.5rem', // Reduced from 1.75rem
+                            counterIncrement: 'ol-counter',
+                            '&::before': {
+                                content: 'counter(ol-counter) "."',
+                                position: 'absolute',
+                                left: 0,
+                                color: '#4a4a6a', // Changed from blue to neutral gray
+                                fontWeight: 700,
+                                fontSize: '1em'
+                            }
+                        }
+                    },
+
+                    // Nested lists - Reduced indentation
+                    '& li ul, & li ol': {
+                        marginTop: '0.625rem',
+                        marginBottom: '0.625rem',
+                        marginLeft: '0.25rem' // Reduced from 0.5rem
+                    },
+
+                    // Second level lists
+                    '& ul ul > li::before': {
+                        content: '"◦"',
+                        fontSize: '1em',
+                        color: '#6c757d' // Slightly lighter gray
+                    },
+
+                    // Third level lists
+                    '& ul ul ul > li::before': {
+                        content: '"▪"',
+                        fontSize: '0.8em',
+                        color: '#6c757d' // Slightly lighter gray
                     },
 
                     // Blockquotes
                     '& blockquote': {
-                        borderLeft: '4px solid #0066ff',
-                        paddingLeft: '1rem',
-                        margin: '1.5rem 0',
+                        borderLeft: '4px solid #e9ecef', // Changed to neutral color
+                        paddingLeft: '1.5rem',
+                        margin: '2rem 0',
                         backgroundColor: '#f8f9fa',
-                        padding: '1rem 1rem 1rem 2rem',
-                        borderRadius: '0 6px 6px 0',
+                        padding: '1.25rem 1.5rem 1.25rem 2rem',
+                        borderRadius: '0 8px 8px 0',
                         fontStyle: 'italic',
-                        color: '#4a4a6a'
+                        color: '#4a4a6a',
+                        position: 'relative',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                        '& p': {
+                            marginBottom: '0.5rem',
+                            '&:last-child': {
+                                marginBottom: 0
+                            }
+                        },
+                        '&::before': {
+                            content: '"""',
+                            position: 'absolute',
+                            top: '0.5rem',
+                            left: '0.75rem',
+                            fontSize: '2rem',
+                            color: '#e9ecef', // Neutral quote color
+                            opacity: 0.5,
+                            fontWeight: 700
+                        }
+                    },
+
+                    // Horizontal rules
+                    '& hr': {
+                        border: 'none',
+                        height: '3px',
+                        background: 'linear-gradient(90deg, transparent, #e9ecef, transparent)',
+                        margin: '2.5rem 0',
+                        borderRadius: '2px'
+                    },
+
+                    // Links
+                    '& a': {
+                        color: '#0066ff',
+                        textDecoration: 'none',
+                        fontWeight: 500,
+                        borderBottom: '2px solid transparent',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                            borderBottomColor: '#0066ff',
+                            background: 'rgba(0, 102, 255, 0.05)',
+                            padding: '0 2px',
+                            margin: '0 -2px',
+                            borderRadius: '4px'
+                        }
+                    },
+
+                    // Tables (if any)
+                    '& table': {
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        marginBottom: '1.5rem',
+                        border: '2px solid #e9ecef',
+                        borderRadius: '8px',
+                        overflow: 'hidden'
+                    },
+                    '& th': {
+                        backgroundColor: '#f8f9fa',
+                        padding: '0.75rem 1rem',
+                        fontWeight: 700,
+                        textAlign: 'left',
+                        borderBottom: '2px solid #e9ecef',
+                        color: '#1a1a2e'
+                    },
+                    '& td': {
+                        padding: '0.75rem 1rem',
+                        borderBottom: '1px solid #f5f5f5'
+                    },
+                    '& tr:last-child td': {
+                        borderBottom: 'none'
+                    },
+                    '& tr:hover': {
+                        backgroundColor: '#fafafa'
                     }
                 }}
             >

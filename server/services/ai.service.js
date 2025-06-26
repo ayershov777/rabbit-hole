@@ -791,10 +791,10 @@ Return ONLY a JSON array of new concepts that expand the breadth.`;
     cleanContent(content) {
         // Clean up the content (remove excessive whitespace, ensure proper formatting)
         return content
-            .trim()
-            .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newlines
-            .replace(/[ \t]+/g, ' ') // Replace multiple spaces/tabs with single space (but preserve newlines)
-            .replace(/\. /g, '. ') // Ensure proper sentence spacing
+            // .trim()
+            // .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newlines
+            // .replace(/[ \t]+/g, ' ') // Replace multiple spaces/tabs with single space (but preserve newlines)
+            // .replace(/\. /g, '. ') // Ensure proper sentence spacing
             .trim();
     }
 }
