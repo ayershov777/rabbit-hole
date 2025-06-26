@@ -5,7 +5,7 @@ const AIService = require('../services/ai.service');
 const router = express.Router();
 const aiService = new AIService();
 
-// API endpoint for concept breakdown
+// API endpoint for concept breakdown with priorities
 router.post('/breakdown', optionalAuth, async (req, res) => {
     try {
         const { concept, learningPath = [] } = req.body;
@@ -17,10 +17,9 @@ router.post('/breakdown', optionalAuth, async (req, res) => {
 
         console.log(`Breaking down: "${concept}" with learning path: [${learningPath.join(' → ')}] for user: ${userId || 'anonymous'}`);
 
-        const text = await aiService.generateBreakdown(concept, learningPath, userId);
-        const breakdown = aiService.parseBreakdownResponse(text);
+        const { breakdown, priorities } = await aiService.generateBreakdownWithPriorities(concept, learningPath, userId);
 
-        res.json({ breakdown });
+        res.json({ breakdown, priorities });
 
     } catch (error) {
         console.error('Error in /api/breakdown:', error);

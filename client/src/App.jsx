@@ -40,7 +40,7 @@ const actionLoadingMessages = {
   breakdown: [
     "Analyzing concept structure...",
     "Identifying key components...",
-    "Mapping detailed areas...",
+    "Evaluating learning priorities...",
     "Organizing sub-concepts...",
     "Finalizing breakdown structure..."
   ],
@@ -69,7 +69,8 @@ export const RabbitHole = () => {
   const [expandedIndex, setExpandedIndex] = useState(-1);
   const [menuButtonsReady, setMenuButtonsReady] = useState(false);
   const [contentCache, setContentCache] = useState(new Map());
-  const [importanceData, setImportanceData] = useState({}); // New state for importance explanations
+  const [importanceData, setImportanceData] = useState({});
+  const [priorityData, setPriorityData] = useState({}); // New state for priority levels
 
   const resultsHeaderRef = useRef(null);
 
@@ -114,6 +115,7 @@ export const RabbitHole = () => {
     setCurrentBreakdown(null);
     setCurrentContent(null);
     setImportanceData({});
+    setPriorityData({});
     setSelectedIndex(-1);
     setExpandedIndex(-1);
 
@@ -154,12 +156,14 @@ export const RabbitHole = () => {
         const newBreakdown = {
           concept: conceptText,
           breakdown: data.breakdown,
+          priorities: data.priorities || {}, // Store priorities
           timestamp: Date.now()
         };
 
         setCurrentBreakdown(newBreakdown);
         setCurrentContent(null);
         setContentType('breakdown');
+        setPriorityData(data.priorities || {}); // Set priority data
 
         // Set as first and only item in fresh history
         console.log('Setting fresh breakdown history:', [newBreakdown]);
@@ -250,6 +254,7 @@ export const RabbitHole = () => {
         setCurrentBreakdown(cachedContent);
         setCurrentContent(null);
         setContentType('breakdown');
+        setPriorityData(cachedContent.priorities || {}); // Set cached priority data
 
         // Update history if this is a new breakdown
         if (cachedContent.concept !== (breakdownHistory[currentHistoryIndex]?.concept)) {
@@ -292,7 +297,8 @@ export const RabbitHole = () => {
     if (action === 'breakdown') {
       setCurrentBreakdown(null);
       setCurrentContent(null);
-      setImportanceData({}); // Clear importance data when starting new breakdown
+      setImportanceData({});
+      setPriorityData({});
     } else {
       setCurrentContent(null);
     }
@@ -342,12 +348,14 @@ export const RabbitHole = () => {
           const newBreakdown = {
             concept: conceptText,
             breakdown: data.breakdown,
+            priorities: data.priorities || {}, // Store priorities
             timestamp: Date.now()
           };
 
           setCurrentBreakdown(newBreakdown);
           setCurrentContent(null);
           setContentType('breakdown');
+          setPriorityData(data.priorities || {}); // Set priority data
           contentToCache = newBreakdown;
 
           // Generate importance explanations for all breakdown items
@@ -458,7 +466,8 @@ export const RabbitHole = () => {
       error: '',
       expandedIndex: -1,
       contentCache: new Map(),
-      importanceData: {}
+      importanceData: {},
+      priorityData: {}
     };
 
     // Set all state at once to avoid timing issues
@@ -471,6 +480,7 @@ export const RabbitHole = () => {
     setExpandedIndex(freshState.expandedIndex);
     setContentCache(freshState.contentCache);
     setImportanceData(freshState.importanceData);
+    setPriorityData(freshState.priorityData);
 
     // Clear ALL chat history on server for completely fresh start
     try {
@@ -531,6 +541,7 @@ export const RabbitHole = () => {
     setCurrentHistoryIndex(index);
     setSelectedIndex(-1);
     setExpandedIndex(-1);
+    setPriorityData(historyItem.priorities || {}); // Set priority data from history
   };
 
   const goBackToBreakdown = () => {
@@ -540,6 +551,7 @@ export const RabbitHole = () => {
       setContentType('breakdown');
       setSelectedIndex(-1);
       setExpandedIndex(-1);
+      setPriorityData(breakdownHistory[currentHistoryIndex].priorities || {}); // Set priority data
     }
   };
 
@@ -841,6 +853,7 @@ export const RabbitHole = () => {
                     onActionSelect={handleActionSelect}
                     onKeyDown={handleListboxKeyDown}
                     importanceData={importanceData}
+                    priorityData={priorityData} // Pass priority data
                   />
                 )}
 

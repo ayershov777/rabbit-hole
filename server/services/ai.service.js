@@ -38,6 +38,25 @@ Rules:
 Format: Return ONLY a JSON array like ["sub-concept 1", "sub-concept 2", "sub-concept 3"]`;
     }
 
+    createPrioritySystemPrompt() {
+        return `You are an expert educational assistant that evaluates how essential sub-concepts are for achieving a practical, working knowledge of a main topic. Your goal is to assess each sub-concept's priority level based on how necessary it is for someone to understand and effectively use the main concept.
+
+Priority Levels:
+1. **Essential** - Core foundation required for any practical use
+2. **Important** - Significantly enhances understanding and capability
+3. **Useful** - Good to know, provides deeper insight
+4. **Advanced** - Specialized knowledge for expert-level mastery
+
+Consider:
+- Can someone have a working knowledge of the main topic without understanding this sub-concept?
+- Is this sub-concept frequently encountered in practical applications?
+- Would lacking this knowledge significantly impair someone's ability to use the main topic effectively?
+- Is this more theoretical depth or practical necessity?
+
+Format: Return a JSON object mapping each sub-concept to its priority level (1-4) and a brief reason (10-15 words).
+Example: {"concept1": {"level": 1, "reason": "Foundation for all practical applications"}}`;
+    }
+
     createImportanceSystemPrompt() {
         return `You are an expert educational assistant that explains why sub-concepts are important components of the main topic. Your goal is to provide quick, compelling reasons why each sub-concept matters within the broader field.
 
@@ -69,6 +88,156 @@ Rules:
 9. Be specific about what this concept includes and covers
 
 Format: Return a well-organized explanation (2-3 paragraphs, about 150-200 words) that gives a thorough but concise overview of what the concept encompasses.`;
+    }
+
+    async generateBreakdownWithPriorities(concept, learningPath = [], userId = null) {
+        try {
+            // First, get the breakdown
+            const breakdownText = await this.generateBreakdown(concept, learningPath, userId);
+            const breakdown = this.parseBreakdownResponse(breakdownText);
+
+            // Then, evaluate priorities for all sub-concepts
+            const priorities = await this.evaluatePriorities(concept, breakdown, learningPath, userId);
+
+            return { breakdown, priorities };
+
+        } catch (error) {
+            console.error('Error generating breakdown with priorities:', error);
+            throw error;
+        }
+    }
+
+    async evaluatePriorities(mainConcept, subConcepts, learningPath = [], userId = null) {
+        try {
+            const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
+
+            // Create unique session key for priority evaluation
+            let baseSessionKey;
+            if (learningPath.length === 0) {
+                baseSessionKey = `${userId || 'anonymous'}_root_${mainConcept.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            } else {
+                baseSessionKey = `${userId || 'anonymous'}_${learningPath.join(' -> ')}`;
+            }
+
+            const sessionKey = `${baseSessionKey}_priority_eval`;
+            let chatSession;
+
+            if (this.chatSessions.has(sessionKey)) {
+                chatSession = this.chatSessions.get(sessionKey).chat;
+                this.chatSessions.get(sessionKey).lastUsed = Date.now();
+                console.log(`Reusing priority evaluation session: ${sessionKey}`);
+            } else {
+                console.log(`Creating new priority evaluation session: ${sessionKey}`);
+                chatSession = model.startChat({
+                    history: [
+                        {
+                            role: 'user',
+                            parts: [{ text: this.createPrioritySystemPrompt() }]
+                        },
+                        {
+                            role: 'model',
+                            parts: [{ text: 'I understand. I will evaluate how essential each sub-concept is for achieving practical, working knowledge of the main topic, assigning priority levels 1-4 (Essential, Important, Useful, Advanced) with brief reasons.' }]
+                        }
+                    ]
+                });
+
+                this.chatSessions.set(sessionKey, {
+                    chat: chatSession,
+                    lastUsed: Date.now(),
+                    userId: userId,
+                    concept: mainConcept,
+                    learningPath: [...learningPath]
+                });
+            }
+
+            let prompt;
+            if (learningPath.length > 0) {
+                const rootConcept = learningPath[0];
+                prompt = `Main goal: Working knowledge of "${rootConcept}"
+Current focus: "${mainConcept}" (as part of ${learningPath.join(' → ')})
+
+Evaluate how essential each of these sub-concepts is for someone to have practical, working knowledge of "${mainConcept}" in the context of learning "${rootConcept}":
+
+${subConcepts.map((concept, i) => `${i + 1}. ${concept}`).join('\n')}
+
+For each, consider: Can someone effectively work with "${mainConcept}" without understanding this sub-concept?
+
+Return a JSON object with priority levels (1-4) and brief reasons.`;
+            } else {
+                prompt = `Main concept: "${mainConcept}"
+
+Evaluate how essential each of these sub-concepts is for someone to have practical, working knowledge of "${mainConcept}":
+
+${subConcepts.map((concept, i) => `${i + 1}. ${concept}`).join('\n')}
+
+For each, consider: Can someone effectively work with "${mainConcept}" without understanding this sub-concept?
+
+Return a JSON object with priority levels (1-4) and brief reasons.`;
+            }
+
+            const result = await chatSession.sendMessage(prompt);
+            const response = await result.response;
+            return this.parsePriorityResponse(response.text(), subConcepts);
+
+        } catch (error) {
+            console.error('Error evaluating priorities:', error);
+            // Return default priorities if evaluation fails
+            const defaultPriorities = {};
+            subConcepts.forEach(concept => {
+                defaultPriorities[concept] = { level: 2, reason: "Priority evaluation unavailable" };
+            });
+            return defaultPriorities;
+        }
+    }
+
+    parsePriorityResponse(text, concepts) {
+        try {
+            // Clean the response to ensure it's valid JSON
+            let cleanedText = text.trim();
+            cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+            // Extract JSON object
+            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                cleanedText = jsonMatch[0];
+            }
+
+            const priorityData = JSON.parse(cleanedText);
+
+            // Normalize the response to match our concepts
+            const normalizedPriorities = {};
+            concepts.forEach(concept => {
+                // Try to find a matching key in the response
+                const matchingKey = Object.keys(priorityData).find(key =>
+                    key.toLowerCase().includes(concept.toLowerCase()) ||
+                    concept.toLowerCase().includes(key.toLowerCase())
+                );
+
+                if (matchingKey && priorityData[matchingKey]) {
+                    normalizedPriorities[concept] = {
+                        level: priorityData[matchingKey].level || 2,
+                        reason: priorityData[matchingKey].reason || "Important for understanding"
+                    };
+                } else {
+                    // Default if not found
+                    normalizedPriorities[concept] = {
+                        level: 2,
+                        reason: "Important for understanding"
+                    };
+                }
+            });
+
+            return normalizedPriorities;
+
+        } catch (error) {
+            console.error('Error parsing priority response:', error);
+            // Return default priorities
+            const defaultPriorities = {};
+            concepts.forEach(concept => {
+                defaultPriorities[concept] = { level: 2, reason: "Priority evaluation unavailable" };
+            });
+            return defaultPriorities;
+        }
     }
 
     async generateBreakdown(concept, learningPath = [], userId = null) {
