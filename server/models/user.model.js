@@ -18,6 +18,16 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  lastLoginAt: {
+    type: Date,
+    default: Date.now
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true,
 });
 
 // Hash password before saving

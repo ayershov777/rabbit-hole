@@ -9,6 +9,8 @@ const DatabaseService = require('./services/database.service');
 // Routes
 const authRoutes = require('./routes/auth.routes');
 const breakdownRoutes = require('./routes/breakdown.routes');
+const profileRoutes = require('./routes/profile.routes');
+const chatRoutes = require('./routes/chat.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +24,8 @@ app.use(cors());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/live-support', profileRoutes);
+app.use('/api/live-support', chatRoutes);
 app.use('/api', breakdownRoutes);
 
 // Serve static files in production
